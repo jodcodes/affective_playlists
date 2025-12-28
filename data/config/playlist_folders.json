@@ -5,6 +5,12 @@
     "dread": "Dread (Phlegmatic)",
     "malice": "Malice (Choleric)"
   },
-  "auto_create": false,
-  "move_existing": false
+  "genre_folders": {
+    "hiphop": "Hip-Hop",
+    "electronic": "Electronic",
+    "disco_funk_soul": "Disco/Funk/Soul",
+    "jazz": "Jazz",
+    "world": "World",
+    "rock": "Rock"
+  }
 }

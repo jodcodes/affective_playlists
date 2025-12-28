@@ -1,0 +1,19 @@
+{
+    "genre_match": 3,
+    "artist_match": 2,
+    "composer_match": 1,
+    "bpm_match": 1,
+    "bpm_ranges": {
+        "electronic": [120, 140],
+        "disco_funk_soul": [100, 130],
+        "hiphop": [70, 120],
+        "jazz": [80, 180],
+        "rock": [110, 160],
+        "world": [60, 150]
+    },
+    "dominance_threshold": 0.3,
+    "min_track_count": 3,
+    "partial_match_weight": 0.5,
+    "keyword_match_weight": 0.5,
+    "bpm_tolerance": 10
+}

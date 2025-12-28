@@ -2,5 +2,47 @@ get to run
 - enrich meta
 - 4 temper
 - plsort
+Goal:
+Extend the existing Apple Music playlist management code to automatically
+classify playlists into folders based on the songs inside.
 
-make skeleton easier more modular no duplicate code
+Target genre folders:
+- hiphop
+- electronic
+- disco_funk_soul
+- jazz
+- world
+- rock
+
+Requirements:
+- Integrate with your existing AppleScript code for reading playlists and tracks
+- Extract metadata for each track: genre, artist, bpm, year, composer
+- Normalize all text fields (lowercase, trim)
+- Map raw genres to predefined clusters (e.g., "trap" → "hiphop")
+- Score playlists using weighted rules:
+    - genre match: +3
+    - artist match (lookup lists per genre): +2
+    - composer match (especially jazz/world): +1
+    - bpm range match (for electronic/disco): +1
+- Determine dominant genre per playlist using weighted scores
+- Apply ML-based fallback (TF-IDF on genre strings) only if scoring is ambiguous
+- Create playlist folders in Apple Music if missing
+- Move playlists into the dominant genre folder
+- Preserve playlists that don’t meet dominance threshold (skip or mark as "unsorted")
+
+Implementation notes:
+- Keep AppleScript strictly for I/O: reading tracks and moving playlists
+- Perform scoring, artist-lookup, TF-IDF, and dominance calculation in JS/Python
+- Dry-run mode: optional flag that logs all intended moves without modifying Apple Music
+- Include verbose logging for each playlist:
+    - Track-level scores
+    - Playlist-level scores
+    - Dominant genre decision
+    - Skip reasons
+- Allow configuration via local files:
+    - genre_map.json
+    - weights.json
+    - artists/*.txt for artist lookup lists
+- Make the system modular so existing code can be reused without rewriting
+- Integrate cached web sources for additional artist/genre data
+  (Discogs, MusicBrainz, Last.fm, RateYourMusic)

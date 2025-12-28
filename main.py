@@ -109,8 +109,20 @@ def run_playlist_organization(args=None):
             print("ERROR: plsort module not available")
             return 1
         
-        # Run plsort with default settings (dry-run, no extra args)
-        result = plsort_module.main(args=[])
+        # Check if whitelist is enabled
+        whitelist_enabled, whitelist = load_centralized_whitelist()
+        
+        if whitelist_enabled:
+            print(f"Whitelist is ENABLED with {len(whitelist)} playlists")
+            print("The system will only process whitelisted playlists.")
+        else:
+            print("Whitelist is DISABLED - all playlists will be processed")
+        
+        print("\nRunning in DRY-RUN mode by default (no changes will be made)")
+        print("To actually move playlists, use: python src/plsort.py (without --dry-run)")
+        
+        # Run plsort with dry-run mode enabled by default for main.py integration
+        result = plsort_module.main(args=['--dry-run', '--no-interactive'])
         return result if result is not None else 0
     except Exception as e:
         logger.error(f"Playlist organization failed: {e}")

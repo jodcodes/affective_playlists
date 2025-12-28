@@ -3,7 +3,7 @@
 plsort - Playlist Organization and Classification
 
 Categorizes playlists by genre (world, electronic, jazz, disco/funk/soul, rock, hip-hop)
-using artist lists and metadata enrichment.
+using enhanced weighted scoring, artist lists, and metadata enrichment.
 """
 
 import sys
@@ -11,7 +11,7 @@ import os
 import argparse
 import json
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from tqdm import tqdm
 
 # Add project root to path
@@ -19,83 +19,300 @@ PROJECT_ROOT = Path(__file__).parent
 sys.path.insert(0, str(PROJECT_ROOT.parent))
 
 from logger import setup_logger
+from playlist_classifier import PlaylistClassifier
+from playlist_manager import PlaylistManager
+from apple_music import AppleMusicInterface
+from config import load_centralized_whitelist, get_filtered_playlists
 
 logger = setup_logger(__name__)
 
 
-def load_genre_data() -> Dict[str, List[str]]:
-    """Load genre-based artist lists from centralized data folder."""
-    genres = {}
-    # All data is now centralized in data/ folder
+def load_config_data() -> Dict[str, Any]:
+    """Load configuration data from centralized config directory."""
     data_root = PROJECT_ROOT.parent if PROJECT_ROOT.name == 'src' else PROJECT_ROOT
-    artist_lists_dir = data_root / "data" / "artist_lists"
+    config_dir = data_root / "data" / "config"
     
-    genre_files = {
-        "world": "world.json",
-        "electronic": "electronic.json",
-        "jazz": "jazz.json",
-        "disco_funk_soul": "disco_funk_soul.json",
-        "rock": "rock.json",
-        "hiphop": "hiphop.json",
+    config = {
+        'genre_map_path': config_dir / "genre_map.json",
+        'weights_path': config_dir / "weights.json", 
+        'artist_lists_dir': data_root / "data" / "artist_lists",
+        'playlist_folders_path': config_dir / "playlist_folders.json"
     }
     
-    for genre_name, filename in genre_files.items():
-        filepath = artist_lists_dir / filename
-        try:
-            if filepath.exists():
-                with open(filepath, 'r') as f:
-                    data = json.load(f)
-                    genres[genre_name] = {
-                        "artists": data.get("artists", []),
-                        "keywords": data.get("keywords", []),
-                        "description": data.get("description", "")
-                    }
-        except Exception as e:
-            logger.warning(f"Failed to load genre data for {genre_name}: {e}")
-    
-    return genres
+    # Verify all config files exist
+    for name, path in config.items():
+        if not path.exists():
+            logger.error(f"Configuration file not found: {path}")
+            
+    return config
 
 
-def classify_playlist(playlist_name: str, track_artists: List[str], genres: Dict) -> Optional[str]:
+def get_apple_music_tracks_data(playlist_name: str, apple_music: AppleMusicInterface) -> List[Dict[str, Any]]:
     """
-    Classify a playlist into one of the defined genres.
+    Get track data for a playlist from Apple Music.
     
     Args:
         playlist_name: Name of the playlist
-        track_artists: List of artist names in the playlist
-        genres: Genre classification data
-    
-    Returns:
-        Assigned genre name or None
-    """
-    if not track_artists:
-        return None
-    
-    genre_scores = {genre: 0 for genre in genres.keys()}
-    
-    # Score each track against each genre
-    for artist in track_artists:
-        artist_lower = artist.lower()
+        apple_music: Apple Music interface instance
         
-        for genre_name, genre_data in genres.items():
-            # Check if artist is in genre's artist list
-            if any(a.lower() == artist_lower for a in genre_data.get("artists", [])):
-                genre_scores[genre_name] += 2
-            
-            # Check if artist matches any keyword
-            if any(kw in artist_lower for kw in genre_data.get("keywords", [])):
-                genre_scores[genre_name] += 1
-    
-    # Return the genre with highest score
-    if max(genre_scores.values()) > 0:
-        return max(genre_scores, key=genre_scores.get)
-    
-    return None
-
-
-def categorize_playlists(dry_run: bool = True, verbose: bool = False, interactive: bool = True, playlist_names: List[str] = None) -> int:
+    Returns:
+        List of track metadata dictionaries
     """
-    Main function to categorize playlists.
+    try:
+        # Get all playlists to find the target one
+        playlist_names = apple_music.get_playlist_names()
+        
+        if playlist_name not in playlist_names:
+            logger.warning(f"Playlist not found: {playlist_name}")
+            return []
+        
+        # Get tracks for the playlist
+        tracks = apple_music.get_playlist_tracks(playlist_name)
+        
+        if not tracks:
+            logger.warning(f"No tracks found for playlist: {playlist_name}")
+            return []
+            
+        logger.debug(f"Retrieved {len(tracks)} tracks for '{playlist_name}'")
+        return tracks
+        
+    except Exception as e:
+        logger.error(f"Failed to get tracks for playlist '{playlist_name}': {e}")
+        return []
+
+
+def classify_single_playlist(playlist_name: str, classifier: PlaylistClassifier, 
+                           apple_music: AppleMusicInterface, verbose: bool = False) -> tuple[Optional[str], Dict[str, Any]]:
+    """
+    Classify a single playlist.
+    
+    Args:
+        playlist_name: Name of the playlist to classify
+        classifier: Playlist classifier instance
+        apple_music: Apple Music interface instance
+        verbose: Enable verbose logging
+        
+    Returns:
+        Tuple of (assigned_genre, classification_details)
+    """
+    logger.info(f"Classifying playlist: {playlist_name}")
+    
+    # Get track data from Apple Music
+    tracks = get_apple_music_tracks_data(playlist_name, apple_music)
+    
+    if not tracks:
+        return None, {'error': 'No tracks found', 'playlist_name': playlist_name}
+    
+    # Classify the playlist
+    assigned_genre, classification_details = classifier.classify_playlist(tracks, playlist_name)
+    
+    if verbose:
+        print(f"\n" + "="*70)
+        print(f"CLASSIFICATION DETAILS: {playlist_name}")
+        print("="*70)
+        print(f"Tracks analyzed: {len(tracks)}")
+        print(f"Assigned genre: {assigned_genre or 'UNCLASSIFIED'}")
+        print(f"Classification method: {classification_details.get('method', 'unknown')}")
+        print(f"Confidence: {classification_details.get('confidence', 0):.2f}")
+        print(f"Reason: {classification_details.get('reason', 'N/A')}")
+        
+        if 'scores' in classification_details:
+            print("\nGenre Scores:")
+            for genre, score in classification_details['scores'].items():
+                print(f"  {genre:15s}: {score:.2f}")
+                
+        if 'tfidf_scores' in classification_details:
+            print("\nTF-IDF Fallback Scores:")
+            for genre, score in classification_details['tfidf_scores'].items():
+                print(f"  {genre:15s}: {score:.3f}")
+    
+    return assigned_genre, classification_details
+
+
+def classify_multiple_playlists(playlist_names: List[str], classifier: PlaylistClassifier,
+                              apple_music: AppleMusicInterface, verbose: bool = False) -> Dict[str, tuple]:
+    """
+    Classify multiple playlists.
+    
+    Args:
+        playlist_names: List of playlist names to classify
+        classifier: Playlist classifier instance  
+        apple_music: Apple Music interface instance
+        verbose: Enable verbose logging
+        
+    Returns:
+        Dictionary mapping playlist names to (assigned_genre, classification_details) tuples
+    """
+    results = {}
+    
+    print(f"\n" + "="*70)
+    print("PLAYLIST CLASSIFICATION")
+    print("="*70)
+    print(f"Classifying {len(playlist_names)} playlists...\n")
+    
+    for playlist_name in tqdm(playlist_names, desc="Classifying playlists", unit="playlist"):
+        assigned_genre, details = classify_single_playlist(
+            playlist_name, classifier, apple_music, verbose
+        )
+        results[playlist_name] = (assigned_genre, details)
+        
+        # Brief status update
+        status = assigned_genre if assigned_genre else "unclassified"
+        confidence = details.get('confidence', 0)
+        print(f"  {playlist_name:40s} -> {status:15s} (confidence: {confidence:.2f})")
+    
+    return results
+
+
+def organize_classified_playlists(classification_results: Dict[str, tuple], 
+                                playlist_manager: PlaylistManager,
+                                dry_run: bool = True) -> Dict[str, bool]:
+    """
+    Organize classified playlists into folders.
+    
+    Args:
+        classification_results: Results from playlist classification
+        playlist_manager: Playlist manager instance
+        dry_run: If True, only show what would be done
+        
+    Returns:
+        Dictionary mapping playlist names to organization success status
+    """
+    # Filter out unclassified playlists and build assignments
+    playlist_assignments = {}
+    unclassified_playlists = []
+    
+    for playlist_name, (assigned_genre, details) in classification_results.items():
+        if assigned_genre:
+            playlist_assignments[playlist_name] = assigned_genre
+        else:
+            unclassified_playlists.append(playlist_name)
+    
+    print(f"\n" + "="*70)
+    print("PLAYLIST ORGANIZATION")
+    print("="*70)
+    print(f"Mode: {'DRY-RUN' if dry_run else 'EXECUTE'}")
+    print(f"Playlists to organize: {len(playlist_assignments)}")
+    print(f"Unclassified playlists: {len(unclassified_playlists)}")
+    print()
+    
+    # Show what will be done
+    if playlist_assignments:
+        print("Playlist assignments:")
+        for playlist_name, genre in playlist_assignments.items():
+            status = "[DRY-RUN]" if dry_run else "[EXECUTE]"
+            print(f"  {status} {playlist_name:40s} -> {genre}")
+    
+    if unclassified_playlists:
+        print(f"\nUnclassified playlists (will be skipped):")
+        for playlist_name in unclassified_playlists:
+            print(f"  - {playlist_name}")
+    
+    # Perform organization
+    organization_results = {}
+    
+    if playlist_assignments:
+        print(f"\n{'-'*70}")
+        if dry_run:
+            print("DRY-RUN: Simulating playlist organization...")
+            # Simulate the organization
+            for playlist_name in playlist_assignments:
+                organization_results[playlist_name] = True
+            print(f"DRY-RUN: Would organize {len(playlist_assignments)} playlists")
+        else:
+            print("Organizing playlists...")
+            organization_results = playlist_manager.organize_playlists(playlist_assignments)
+    
+    # Add unclassified playlists to results (marked as not organized)
+    for playlist_name in unclassified_playlists:
+        organization_results[playlist_name] = False
+        
+    return organization_results
+
+
+def get_user_playlist_selection(apple_music: AppleMusicInterface) -> Optional[List[str]]:
+    """
+    Get playlist selection from user via interactive menu.
+    
+    Args:
+        apple_music: Apple Music interface instance
+        
+    Returns:
+        List of selected playlist names or None if cancelled
+    """
+    try:
+        print("\nConnecting to Apple Music...")
+        all_playlist_names = apple_music.get_playlist_names()
+        
+        if not all_playlist_names:
+            print("No playlists found in Apple Music.")
+            return None
+        
+        # Load whitelist configuration
+        whitelist_enabled, whitelist = load_centralized_whitelist()
+        
+        # Filter playlists by whitelist if enabled
+        if whitelist_enabled:
+            playlist_names = [name for name in all_playlist_names if name in whitelist]
+            print(f"Whitelist enabled: Found {len(playlist_names)} whitelisted playlists out of {len(all_playlist_names)} total")
+            
+            if not playlist_names:
+                print("No whitelisted playlists found.")
+                return None
+        else:
+            playlist_names = all_playlist_names
+            print(f"Whitelist disabled: Found {len(playlist_names)} playlists in Apple Music")
+        
+        # Show playlist selection menu
+        print("\n" + "="*70)
+        print("PLAYLIST SELECTION" + (f" (Whitelist: {'ON' if whitelist_enabled else 'OFF'})" if whitelist_enabled else ""))
+        print("="*70 + "\n")
+        
+        for idx, name in enumerate(playlist_names, 1):
+            print(f"{idx:2d}. {name}")
+        
+        print("\n" + "-"*70)
+        print("Select playlists to classify:")
+        print("  Enter numbers separated by commas (e.g., 1,3,5)")
+        print("  Or 'all' to select all playlists")
+        print("  Or 'q' to cancel")
+        print("-"*70)
+        
+        while True:
+            user_input = input("\nYour selection: ").strip().lower()
+            
+            if user_input == 'q':
+                return None
+            
+            if user_input == 'all':
+                return playlist_names
+            
+            try:
+                indices = [int(x.strip()) - 1 for x in user_input.split(',')]
+                if any(idx < 0 or idx >= len(playlist_names) for idx in indices):
+                    print(f"Invalid selection. Please enter numbers between 1 and {len(playlist_names)}.")
+                    continue
+                
+                selected_names = [playlist_names[idx] for idx in indices]
+                print(f"\nSelected {len(selected_names)} playlist(s):")
+                for name in selected_names:
+                    print(f"  - {name}")
+                return selected_names
+            except ValueError:
+                print(f"Invalid input. Please enter numbers (1-{len(playlist_names)}) separated by commas, 'all', or 'q'.")
+                continue
+                
+    except Exception as e:
+        logger.error(f"Failed to get playlist selection: {e}")
+        print(f"ERROR: {e}")
+        return None
+
+
+def run_playlist_organization(dry_run: bool = True, verbose: bool = False, 
+                            interactive: bool = True, playlist_names: List[str] = None,
+                            ignore_whitelist: bool = False) -> int:
+    """
+    Main function to run playlist organization and classification.
     
     Args:
         dry_run: If True, only show what would be done
@@ -106,222 +323,105 @@ def categorize_playlists(dry_run: bool = True, verbose: bool = False, interactiv
     Returns:
         Exit code
     """
-    logger.info("Loading genre classification data...")
-    genres = load_genre_data()
+    logger.info("Starting playlist organization system...")
     
-    if not genres:
-        logger.error("No genre data loaded")
+    # Load configuration
+    config = load_config_data()
+    
+    # Initialize components
+    try:
+        logger.info("Initializing playlist classifier...")
+        classifier = PlaylistClassifier(
+            genre_map_path=str(config['genre_map_path']),
+            weights_path=str(config['weights_path']),
+            artist_lists_dir=str(config['artist_lists_dir'])
+        )
+        
+        logger.info("Initializing playlist manager...")
+        playlist_manager = PlaylistManager(dry_run=dry_run)
+        
+        logger.info("Initializing Apple Music interface...")
+        apple_music = AppleMusicInterface()
+        
+    except Exception as e:
+        logger.error(f"Failed to initialize components: {e}")
         return 1
     
-    logger.info(f"Loaded {len(genres)} genre categories:")
-    for genre in genres.keys():
-        logger.info(f"  - {genre}")
-    
-    logger.info("\nPlaylist categorization ready.")
-    logger.info(f"Mode: {'DRY-RUN' if dry_run else 'EXECUTE'}")
-    
-    # If playlists already selected, use them
+    # Get playlists to process
     if playlist_names:
-        logger.info(f"Processing {len(playlist_names)} pre-selected playlists")
-        print(f"\nProcessing {len(playlist_names)} playlists:")
-        for name in playlist_names:
-            print(f"  - {name}")
-        
-        # Categorize the playlists
-        categorization_results = {}
-        print("\nClassifying playlists by genre...")
-        
-        for playlist_name in tqdm(playlist_names, desc="Classifying playlists", unit="playlist"):
-            # For now, just show the playlist name
-            # In the future, this would access the actual playlist data
-            genre = "unknown"
-            categorization_results[playlist_name] = genre
-            logger.debug(f"Classified {playlist_name} as {genre}")
-        
-        # Display results
-        print("\n" + "="*70)
-        print("CLASSIFICATION RESULTS")
-        print("="*70 + "\n")
-        
-        for playlist_name, genre in categorization_results.items():
-            if dry_run:
-                status = "→ (DRY-RUN)"
-            else:
-                status = "→ (organizing)"
-            print(f"  {playlist_name:40s} {status} {genre}")
-        
-        # If not dry-run, move playlists using AppleScript
-        if not dry_run:
-            print("\n" + "-"*70)
-            print("Moving playlists to genre folders...\n")
+        selected_playlists = playlist_names
+        logger.info(f"Processing {len(selected_playlists)} pre-selected playlists")
+    elif interactive:
+        selected_playlists = get_user_playlist_selection(apple_music)
+        if not selected_playlists:
+            print("No playlists selected. Exiting.")
+            return 0
+    else:
+        # Non-interactive mode - get all playlists and filter by whitelist
+        try:
+            all_playlist_names = apple_music.get_playlist_names()
             
-            try:
-                from temperament_analyzer import MusicAppClient
-                music_client = MusicAppClient()
+            if ignore_whitelist:
+                selected_playlists = all_playlist_names
+                logger.info(f"Non-interactive mode ignoring whitelist: processing all {len(selected_playlists)} playlists")
+                print(f"\nIgnoring whitelist: Processing all {len(selected_playlists)} playlists")
+            else:
+                selected_playlists = get_filtered_playlists(all_playlist_names)
                 
-                if not music_client.authenticate():
-                    print("ERROR: Could not connect to Music.app")
-                    return 1
+                whitelist_enabled, whitelist = load_centralized_whitelist()
                 
-                # Get playlist IDs for moving
-                playlist_ids = music_client._get_playlist_ids()
+                if whitelist_enabled:
+                    logger.info(f"Non-interactive mode with whitelist: processing {len(selected_playlists)} "
+                              f"whitelisted playlists out of {len(all_playlist_names)} total")
+                    print(f"\nWhitelist enabled: Processing {len(selected_playlists)} whitelisted playlists "
+                          f"out of {len(all_playlist_names)} total playlists")
+                else:
+                    logger.info(f"Non-interactive mode without whitelist: processing all {len(selected_playlists)} playlists")
+                    print(f"\nWhitelist disabled: Processing all {len(selected_playlists)} playlists")
                 
-                # Create genre folders and move playlists
-                genre_folders = {}  # Cache for created folders
-                
-                for playlist_name, genre in tqdm(categorization_results.items(), desc="Organizing", unit="playlist"):
-                    try:
-                        # Create folder if not already created
-                        if genre not in genre_folders:
-                            folder_id = music_client.create_folder(genre)
-                            if folder_id:
-                                genre_folders[genre] = folder_id
-                            else:
-                                logger.warning(f"Failed to create folder for genre: {genre}")
-                                continue
-                        
-                        # Move playlist to folder
-                        if playlist_name in playlist_ids:
-                            playlist_id = playlist_ids[playlist_name]
-                            folder_id = genre_folders[genre]
-                            
-                            success = music_client.move_playlist_to_folder(playlist_id, folder_id)
-                            if success:
-                                logger.info(f"Moved '{playlist_name}' to folder '{genre}'")
-                            else:
-                                logger.error(f"Failed to move '{playlist_name}' to folder '{genre}'")
-                        else:
-                            logger.warning(f"Playlist '{playlist_name}' not found in Music.app")
-                    except Exception as e:
-                        logger.error(f"Failed to move '{playlist_name}': {e}")
-                
-                print("\n✓ Playlist organization complete!")
-            except Exception as e:
-                logger.error(f"Failed to organize playlists: {e}")
-                print(f"ERROR: {e}")
-                return 1
-        
-        print()
+        except Exception as e:
+            logger.error(f"Failed to get playlists: {e}")
+            return 1
+    
+    if not selected_playlists:
+        print("No playlists to process.")
         return 0
     
-    selected_playlists = None
+    # Classify playlists
+    try:
+        classification_results = classify_multiple_playlists(
+            selected_playlists, classifier, apple_music, verbose
+        )
+    except Exception as e:
+        logger.error(f"Classification failed: {e}")
+        return 1
     
-    if interactive:
-        # Ask user which playlists to process
-        print("\n" + "="*60)
-        print("PLAYLIST SELECTION")
-        print("="*60)
-        print("\nOptions:")
-        print("  1. All whitelisted playlists")
-        print("  2. Select specific playlists from whitelist")
-        print("  0. Cancel")
-        print("-"*60)
-        
-        while True:
-            choice = input("\nYour choice (0-2): ").strip()
-            
-            if choice == "0":
-                print("Cancelled.\n")
-                return 0
-            elif choice == "1":
-                logger.info("Processing: ALL whitelisted playlists")
-                # Just process, don't load again
-                print("\nProcessing all whitelisted playlists...")
-                return 0
-            elif choice == "2":
-                # Select specific playlists
-                try:
-                    from temperament_analyzer import MusicAppClient
-                    
-                    print("\nConnecting to Music.app...")
-                    music_client = MusicAppClient()
-                    
-                    if not music_client.authenticate():
-                        print("ERROR: Could not connect to Music.app")
-                        return 1
-                    
-                    # Get playlist IDs (fast - no tracks loaded)
-                    print("Fetching playlist list from Music.app...")
-                    playlist_ids = music_client._get_playlist_ids()
-                    
-                    # Filter by whitelist
-                    if music_client.whitelist_enabled and music_client.whitelist:
-                        playlist_ids = {name: pid for name, pid in playlist_ids.items() if name in music_client.whitelist}
-                        logger.info(f"Whitelist enabled: {len(playlist_ids)} whitelisted playlists")
-                    
-                    if not playlist_ids:
-                        print("No playlists found.")
-                        return 1
-                    
-                    # Show playlist selection menu (without loading tracks)
-                    print("\n" + "="*60)
-                    print("AVAILABLE PLAYLISTS")
-                    print("="*60 + "\n")
-                    
-                    playlist_list = list(playlist_ids.items())
-                    for idx, (name, pid) in enumerate(playlist_list, 1):
-                        print(f"{idx:2d}. {name}")
-                    
-                    print("\n" + "-"*60)
-                    print("Select playlists to categorize:")
-                    print("  Enter numbers separated by commas (e.g., 1,3,5)")
-                    print("  Or 'all' to select all playlists")
-                    print("  Or 'q' to cancel")
-                    print("-"*60)
-                    
-                    while True:
-                        user_input = input("\nYour selection: ").strip().lower()
-                        
-                        if user_input == 'q':
-                            print("Cancelled.\n")
-                            return 0
-                        
-                        if user_input == 'all':
-                            selected_playlist_names = [name for name, _ in playlist_list]
-                            print(f"\nSelected all {len(selected_playlist_names)} playlists")
-                            break
-                        
-                        try:
-                            indices = [int(x.strip()) - 1 for x in user_input.split(',')]
-                            if any(idx < 0 or idx >= len(playlist_list) for idx in indices):
-                                print(f"Invalid selection. Please enter numbers between 1 and {len(playlist_list)}.")
-                                continue
-                            
-                            selected_playlist_names = [playlist_list[idx][0] for idx in indices]
-                            print(f"\nSelected {len(selected_playlist_names)} playlist(s):")
-                            for name in selected_playlist_names:
-                                print(f"  - {name}")
-                            break
-                        except ValueError:
-                            print(f"Invalid input. Please enter numbers (1-{len(playlist_list)}) separated by commas, 'all', or 'q'.")
-                            continue
-                    
-                    # Now load only the selected playlists with their tracks
-                    print("\nLoading selected playlists...")
-                    selected_playlists_with_tracks = []
-                    
-                    for playlist_name in tqdm(selected_playlist_names, desc="Loading playlists", unit="playlist"):
-                        try:
-                            playlist_id = playlist_ids[playlist_name]
-                            playlist = music_client._get_playlist_with_tracks_by_id(playlist_name, playlist_id)
-                            if playlist and playlist.tracks:
-                                selected_playlists_with_tracks.append(playlist)
-                        except Exception as e:
-                            logger.warning(f"Failed to load playlist '{playlist_name}': {e}")
-                    
-                    print(f"\nLoaded {len(selected_playlists_with_tracks)} playlists with tracks")
-                    
-                    # Return success - playlists are loaded
-                    return 0
-                except Exception as e:
-                    logger.error(f"Failed to load playlists: {e}")
-                    print(f"ERROR: {e}")
-                    return 1
-            else:
-                print("Invalid choice. Please enter 0-2.")
+    # Organize playlists
+    try:
+        organization_results = organize_classified_playlists(
+            classification_results, playlist_manager, dry_run
+        )
+    except Exception as e:
+        logger.error(f"Organization failed: {e}")
+        return 1
     
-    if verbose:
-        logger.debug(f"Genres loaded: {list(genres.keys())}")
+    # Summary
+    classified_count = sum(1 for genre, _ in classification_results.values() if genre)
+    organized_count = sum(1 for success in organization_results.values() if success)
+    
+    print(f"\n" + "="*70)
+    print("SUMMARY")
+    print("="*70)
+    print(f"Total playlists processed: {len(selected_playlists)}")
+    print(f"Successfully classified: {classified_count}")
+    print(f"Successfully organized: {organized_count}")
+    print(f"Unclassified/skipped: {len(selected_playlists) - classified_count}")
+    
+    if dry_run:
+        print("\n✓ DRY-RUN completed successfully!")
+        print("  Re-run without --dry-run to execute the actual organization.")
+    else:
+        print("\n✓ Playlist organization completed!")
     
     return 0
 
@@ -337,40 +437,38 @@ def main(args=None):
     parser.add_argument(
         '--dry-run',
         action='store_true',
-        help='Dry-run mode: show what would be done without modifying'
+        help='Dry-run mode: show what would be done without modifying Apple Music'
     )
     
     parser.add_argument(
         '--verbose', '-v',
         action='store_true',
-        help='Enable verbose logging'
+        help='Enable verbose logging and detailed classification output'
+    )
+    
+    parser.add_argument(
+        '--no-interactive',
+        action='store_true',
+        help='Non-interactive mode: process all playlists without user selection'
     )
     
     parser.add_argument(
         '--playlist',
         type=str,
-        help='Process single playlist by name'
+        action='append',
+        help='Process specific playlist(s) by name (can be used multiple times)'
     )
     
     parser.add_argument(
-        '--enrich',
-        type=str,
-        nargs='+',
-        choices=['musicbrainz', 'lastfm', 'discogs', 'rym'],
-        help='Enrich data from web sources'
+        '--ignore-whitelist',
+        action='store_true',
+        help='Ignore whitelist and process all playlists'
     )
     
     parser.add_argument(
-        '--export',
-        type=str,
-        help='Export results to JSON file'
-    )
-    
-    parser.add_argument(
-        '--config-dir',
-        type=str,
-        default=str(PROJECT_ROOT / 'config'),
-        help='Configuration directory (default: config)'
+        '--show-whitelist',
+        action='store_true',
+        help='Show current whitelist configuration and exit'
     )
     
     parsed_args = parser.parse_args(args)
@@ -379,11 +477,37 @@ def main(args=None):
     if parsed_args.verbose:
         logger.setLevel('DEBUG')
     
-    # Determine mode: default is EXECUTE (dry_run=False), unless --dry-run is specified
-    dry_run = parsed_args.dry_run
+    # Handle whitelist display option
+    if parsed_args.show_whitelist:
+        try:
+            whitelist_enabled, whitelist = load_centralized_whitelist()
+            print(f"\nWhitelist Status: {'ENABLED' if whitelist_enabled else 'DISABLED'}")
+            print(f"Whitelisted Playlists: {len(whitelist)}")
+            if whitelist:
+                print("\nWhitelisted playlists:")
+                for playlist in sorted(whitelist):
+                    print(f"  - {playlist}")
+            else:
+                print("No playlists in whitelist.")
+            return 0
+        except Exception as e:
+            print(f"Error loading whitelist: {e}")
+            return 1
     
-    # Run with interactive mode enabled (pass args=[] to categorize_playlists)
-    return categorize_playlists(dry_run=dry_run, verbose=parsed_args.verbose, interactive=True)
+    # Determine interactive mode
+    interactive = not parsed_args.no_interactive
+    
+    # Use provided playlist names if specified
+    playlist_names = parsed_args.playlist
+    
+    # Run playlist organization
+    return run_playlist_organization(
+        dry_run=parsed_args.dry_run,
+        verbose=parsed_args.verbose,
+        interactive=interactive,
+        playlist_names=playlist_names,
+        ignore_whitelist=parsed_args.ignore_whitelist
+    )
 
 
 if __name__ == '__main__':
