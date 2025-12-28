@@ -1,4 +1,10 @@
-# Git ignore for plMetaTemp
+# Git ignore for affective_playlists
+
+todo
+
+# Examples (local use only)
+playlists_folders.json
+whitelist.json
 
 # Virtual environments
 venv/
