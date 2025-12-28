@@ -1,5 +1,5 @@
 #!/bin/bash
-# plMetaTemp Environment Activation Script
+# affective_playlists Environment Activation Script
 # Activates virtual environment and installs dependencies if needed
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -11,7 +11,7 @@ RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-echo -e "${GREEN}plMetaTemp - Environment Activation${NC}"
+echo -e "${GREEN}affective_playlists - Environment Activation${NC}"
 echo ""
 
 # Create venv if needed
@@ -42,7 +42,7 @@ else
 fi
 
 echo ""
-echo -e "${GREEN}✓ plMetaTemp environment ready!${NC}"
+echo -e "${GREEN}✓ affective_playlists environment ready!${NC}"
 echo ""
 echo "Available commands:"
 echo "  python main.py              # Interactive menu"

@@ -1,10 +1,10 @@
-# plMetaTemp - Quick Start Guide
+# affective_playlists - Quick Start Guide
 
-**Welcome to the unified plMetaTemp project!**
+**Welcome to the unified affective_playlists project!**
 
 This guide will get you up and running in 5 minutes.
 
-## What is plMetaTemp?
+## What is affective_playlists?
 
 A unified suite of three complementary music tools:
 - **4tempers** - Classify playlists by emotional temperament using AI
@@ -19,7 +19,7 @@ A unified suite of three complementary music tools:
 
 ### 2. Clone & Navigate
 ```bash
-cd /Users/joeldebeljak/own_repos/plMetaTemp
+cd /Users/joeldebeljak/own_repos/affective_playlists
 ```
 
 ### 3. Run Setup Script
@@ -51,7 +51,7 @@ vim .env
 - `SPOTIFY_CLIENT_ID/SECRET` - Better metadata
 - `LASTFM_API_KEY` - Last.fm data access
 
-## Running plMetaTemp
+## Running affective_playlists
 
 ### Option 1: Interactive Menu (Recommended)
 ```bash

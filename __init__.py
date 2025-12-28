@@ -1,5 +1,5 @@
 """
-plMetaTemp Package
+affective_playlists Package
 
 Unified package for three music analysis and organization subprojects:
 - 4tempers: AI-based playlist temperament analysis

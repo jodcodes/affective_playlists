@@ -1,4 +1,4 @@
-# plMetaTemp 🎵
+# affective_playlists 🎵
 
 **A unified suite of music analysis and organization tools for Apple Music.**
 
@@ -62,7 +62,7 @@ Automatically organizes your Apple Music playlists by genre:
 
 ### Unified Structure
 ```
-plMetaTemp/
+affective_playlists/
 ├── main.py              # Main CLI entry point
 ├── setup.sh             # Setup script
 ├── activate.sh          # Environment activation
@@ -95,7 +95,7 @@ plMetaTemp/
 ### Full Setup
 ```bash
 # 1. Navigate to project
-cd /Users/joeldebeljak/own_repos/plMetaTemp
+cd /Users/joeldebeljak/own_repos/affective_playlists
 
 # 2. Run setup (creates venv, installs dependencies)
 bash setup.sh
@@ -245,7 +245,7 @@ osascript -e 'tell application "Music" to return name'
 ### Module Not Found Errors
 ```bash
 # Ensure PYTHONPATH includes project root
-export PYTHONPATH=/Users/joeldebeljak/own_repos/plMetaTemp:$PYTHONPATH
+export PYTHONPATH=/Users/joeldebeljak/own_repos/affective_playlists:$PYTHONPATH
 
 # Or use activation script
 source activate.sh

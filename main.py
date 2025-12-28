@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""
-plMetaTemp - Unified CLI Entry Point
+"""affective_playlists - Unified CLI Entry Point
 
-Main entry point for the plMetaTemp project, which unifies three subprojects:
+Main entry point for the affective_playlists project, which unifies three subprojects:
 1. 4tempers - AI-based playlist temperament analysis
 2. metad_enr - Metadata filling and enrichment
 3. plsort - Playlist organization and classification
@@ -130,7 +129,7 @@ def show_subrepo_arguments(subrepo: str) -> None:
 def show_interactive_menu() -> int:
     """Show interactive menu to select and run a subrepo."""
     print("\n" + "="*70)
-    print("plMetaTemp - Unified Music Analysis & Organization")
+    print("affective_playlists - Unified Music Analysis & Organization")
     print("="*70)
     print("\nSelect a subproject to run:\n")
     
@@ -192,7 +191,7 @@ def show_interactive_menu() -> int:
 def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
-        description="plMetaTemp - Unified Music Analysis & Organization",
+        description="affective_playlists - Unified Music Analysis & Organization",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__
     )
