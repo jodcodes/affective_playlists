@@ -1,0 +1,16 @@
+{
+  "genres": [
+    "world",
+    "electronic",
+    "jazz",
+    "disco_funk_soul",
+    "rock",
+    "hiphop"
+  ],
+  "apple_music_enabled": true,
+  "enrichment_sources": [
+    "musicbrainz",
+    "lastfm",
+    "discogs"
+  ]
+}
