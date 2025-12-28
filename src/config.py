@@ -22,17 +22,16 @@ def load_centralized_whitelist(enabled_by_default: bool = False) -> tuple[bool, 
         - playlist_set: Set of whitelisted playlist names (empty if disabled)
     """
     try:
-        # Path to centralized whitelist at project root
-        # Work from different directory levels
+        # Path to centralized whitelist in data/config/
         current_dir = os.path.dirname(os.path.abspath(__file__))
         
         # Try multiple paths in case we're in different directories
         possible_paths = [
-            os.path.join(current_dir, '..', 'whitelist.json'),
-            os.path.join(current_dir, '..', '..', 'whitelist.json'),
-            'whitelist.json',
-            '../whitelist.json',
-            '../../whitelist.json',
+            os.path.join(current_dir, '..', 'data', 'config', 'whitelist.json'),
+            os.path.join(current_dir, '..', 'data', 'config', 'playlist_whitelist.json'),
+            'data/config/whitelist.json',
+            '../data/config/whitelist.json',
+            '../../data/config/whitelist.json',
         ]
         
         whitelist_path = None

@@ -23,9 +23,11 @@ logger = setup_logger(__name__)
 
 
 def load_genre_data() -> Dict[str, List[str]]:
-    """Load genre-based artist lists."""
+    """Load genre-based artist lists from centralized data folder."""
     genres = {}
-    artist_lists_dir = PROJECT_ROOT / "data" / "artist_lists"
+    # All data is now centralized in data/ folder
+    data_root = PROJECT_ROOT.parent if PROJECT_ROOT.name == 'src' else PROJECT_ROOT
+    artist_lists_dir = data_root / "data" / "artist_lists"
     
     genre_files = {
         "world": "world.json",
