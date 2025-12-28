@@ -1,0 +1,14 @@
+# plMetaTemp - Unified Dependencies
+# Shared dependencies for 4tempers, metad_enr, and plsort subprojects
+
+# Core dependencies
+requests>=2.31.0          # HTTP requests (4tempers, metad_enr)
+python-dotenv>=1.0.0      # Environment variable management
+
+# Optional for development/testing:
+# pytest>=6.0              # For running tests
+# black>=21.0              # Code formatting
+# pylint>=2.0              # Linting
+
+# Note: Python 3.8+ is required for all subprojects
+# macOS is required for Apple Music integration via AppleScript
