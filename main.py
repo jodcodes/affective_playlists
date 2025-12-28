@@ -29,15 +29,31 @@ from apple_music import AppleMusicInterface
 from normalizer import TextNormalizer
 from config import load_centralized_whitelist
 
-# Import main modules
-try:
-    from temperament_analyzer import TemperamentAnalyzer
-    from metadata_fill import MetadataFiller
-    from plsort import PlaylistSorter
-except ImportError as e:
-    print(f"Warning: Could not import all modules: {e}")
-
 logger = setup_logger("affective_playlists")
+
+# Import main modules
+temperament_analyzer = None
+metadata_fill = None
+plsort_module = None
+
+try:
+    from temperament_analyzer import TemperamentAnalyzer, MusicAppClient, OpenAILLMClient
+    temperament_analyzer = sys.modules.get('temperament_analyzer')
+except ImportError as e:
+    print(f"Warning: Could not import temperament_analyzer: {e}")
+
+try:
+    from metadata_fill import MetadataFillCLI
+    metadata_fill = sys.modules.get('metadata_fill')
+except ImportError as e:
+    print(f"Warning: Could not import metadata_fill: {e}")
+except Exception as e:
+    print(f"Error importing metadata_fill: {e}")
+
+try:
+    import plsort as plsort_module
+except ImportError as e:
+    print(f"Warning: Could not import plsort: {e}")
 
 
 def run_temperament_analysis(args=None):
@@ -47,12 +63,23 @@ def run_temperament_analysis(args=None):
     print("="*70 + "\n")
     
     try:
-        analyzer = TemperamentAnalyzer()
+        # Initialize clients
+        music_client = MusicAppClient()
+        llm_client = OpenAILLMClient()
+        
+        # Authenticate
+        if not music_client.authenticate():
+            print("ERROR: Could not connect to Music.app")
+            return 1
+        
+        # Run analysis
+        analyzer = TemperamentAnalyzer(music_client, llm_client)
         analyzer.run()
+        return 0
     except Exception as e:
         logger.error(f"Temperament analysis failed: {e}")
+        print(f"ERROR: {e}")
         return 1
-    return 0
 
 
 def run_metadata_enrichment(args=None):
@@ -62,12 +89,13 @@ def run_metadata_enrichment(args=None):
     print("="*70 + "\n")
     
     try:
-        enricher = MetadataFiller()
-        enricher.run()
+        cli = MetadataFillCLI()
+        cli.run()
+        return 0
     except Exception as e:
         logger.error(f"Metadata enrichment failed: {e}")
+        print(f"ERROR: {e}")
         return 1
-    return 0
 
 
 def run_playlist_organization(args=None):
@@ -77,12 +105,17 @@ def run_playlist_organization(args=None):
     print("="*70 + "\n")
     
     try:
-        sorter = PlaylistSorter()
-        sorter.run()
+        if plsort_module is None:
+            print("ERROR: plsort module not available")
+            return 1
+        
+        # Run plsort with default settings (dry-run, no extra args)
+        result = plsort_module.main(args=[])
+        return result if result is not None else 0
     except Exception as e:
         logger.error(f"Playlist organization failed: {e}")
+        print(f"ERROR: {e}")
         return 1
-    return 0
 
 
 def show_interactive_menu():

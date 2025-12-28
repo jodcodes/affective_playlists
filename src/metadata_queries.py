@@ -20,7 +20,7 @@ from typing import Dict, List, Optional, Tuple
 import logging
 import time
 from abc import ABC, abstractmethod
-from .metadata_enrichment import MetadataField, DatabaseSource, MetadataEntry
+from metadata_enrichment import MetadataField, DatabaseSource, MetadataEntry
 
 
 class DatabaseQuery(ABC):

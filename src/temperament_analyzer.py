@@ -38,6 +38,7 @@ from enum import Enum
 
 import requests
 from dotenv import load_dotenv
+from tqdm import tqdm
 from track_metadata import TrackMetadataClient, SpotifyTrackMetadataClient, MusicBrainzTrackMetadataClient, MockTrackMetadataClient
 from prompts import SYSTEM_PROMPT_TRACK, SYSTEM_PROMPT_PLAYLIST, get_track_classification_prompt, get_playlist_classification_prompt, log_temperament_info
 from databases import log_database_info, get_recommended_provider, log_database_selection
@@ -230,8 +231,8 @@ class MusicAppClient(MusicLibraryClient):
     
     def __init__(self):
         self.music_app = "Music"  # macOS Monterey+ uses "Music" app
-        # Point to shared scripts directory
-        self.script_dir = os.path.join(os.path.dirname(__file__), '..', 'shared', 'scripts')
+        # Point to scripts directory (now in src/scripts/)
+        self.script_dir = os.path.join(os.path.dirname(__file__), 'scripts')
         # Load shared configurations
         self.whitelist_enabled, self.whitelist = self._load_whitelist()
         self.playlist_folders_config = self._load_playlist_folders_config()
@@ -242,17 +243,17 @@ class MusicAppClient(MusicLibraryClient):
     def _load_whitelist():
         """Load centralized whitelist configuration using shared module"""
         try:
-            from shared.config import load_centralized_whitelist
+            from config import load_centralized_whitelist
             return load_centralized_whitelist(enabled_by_default=False)
         except ImportError:
             logger.warning("Could not import shared.config")
             return False, set()
     
     def _load_playlist_folders_config(self) -> dict:
-        """Load playlist folders config from shared directory"""
+        """Load playlist folders config from data/config/ directory"""
         try:
             import json
-            config_path = os.path.join(os.path.dirname(__file__), '..', 'shared', 'config', 'playlist_folders.json')
+            config_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'config', 'playlist_folders.json')
             with open(config_path, 'r') as f:
                 return json.load(f)
         except Exception as e:
@@ -288,14 +289,19 @@ class MusicAppClient(MusicLibraryClient):
                 logger.error("Failed to get playlist IDs")
                 return {}
             
-            # Parse output: name:..., id:..., name:..., id:...
+            # Parse output: name:PlaylistName, id:HEXid, name:...
             import re
             playlists = {}
-            matches = re.findall(r"name:'([^']+)',\s*id:([A-F0-9]+)", result)
+            # Match both with and without quotes around names
+            matches = re.findall(r"name:([^,]+),\s*id:([A-F0-9]+)", result)
             
             for name, pid in matches:
-                playlists[name] = pid
+                # Clean up name (remove quotes if present)
+                name = name.strip().strip("'\"")
+                if name and pid:
+                    playlists[name] = pid
             
+            logger.debug(f"Parsed {len(playlists)} playlists from AppleScript output")
             self._playlist_ids_cache = playlists
             return playlists
             
@@ -327,7 +333,7 @@ class MusicAppClient(MusicLibraryClient):
                 playlists_to_process = playlists_with_ids
             
             # Fetch tracks for each playlist using ID
-            for playlist_name, playlist_id in playlists_to_process.items():
+            for playlist_name, playlist_id in tqdm(playlists_to_process.items(), desc="Loading playlists", unit="playlist"):
                 try:
                     logger.debug(f"Processing playlist: {playlist_name} (ID: {playlist_id})")
                     playlist = self._get_playlist_with_tracks_by_id(playlist_name, playlist_id, metadata_client)
@@ -447,9 +453,29 @@ class MusicAppClient(MusicLibraryClient):
             return None
     
     def create_folder(self, folder_name: str) -> str:
-        """Create a playlist folder and return its ID"""
-        logger.info(f"Folder organization: Playlists will be categorized as: {folder_name}")
-        return f"folder_{folder_name.lower().replace(' ', '_')}"
+        """Create a playlist folder in Music.app and return its ID"""
+        try:
+            # Use AppleScript to create folder
+            script = f"""
+tell application "Music"
+    set newFolder to make new folder playlist with properties {{name:"{folder_name}"}}
+    return (get persistent ID of newFolder)
+end tell
+            """
+            result = self._run_applescript(script)
+            folder_id = result.strip() if result else None
+            
+            if folder_id:
+                logger.info(f"Created folder: {folder_name} (ID: {folder_id})")
+                return folder_id
+            else:
+                logger.error(f"Failed to create folder: {folder_name}")
+                return None
+                
+        except Exception as e:
+            logger.warning(f"Could not create folder via AppleScript: {e}")
+            # Fallback: return mock ID
+            return f"folder_{folder_name.lower().replace(' ', '_')}"
     
     def move_playlist_to_folder(self, playlist_id: str, folder_id: str) -> bool:
         """Move a playlist to a folder using persistent IDs"""

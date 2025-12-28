@@ -1,0 +1,10 @@
+{
+  "temperament_folders": {
+    "woe": "Woe (Melancholic)",
+    "frolic": "Frolic (Sanguine)",
+    "dread": "Dread (Phlegmatic)",
+    "malice": "Malice (Choleric)"
+  },
+  "auto_create": false,
+  "move_existing": false
+}

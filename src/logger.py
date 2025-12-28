@@ -33,6 +33,13 @@ def setup_logger(
     formatter = logging.Formatter(format_string)
     
     logger = logging.getLogger(name)
+    
+    # Remove existing handlers to prevent duplicates
+    logger.handlers.clear()
+    
+    # Prevent propagation to root logger to avoid duplicate logs
+    logger.propagate = False
+    
     logger.setLevel(level)
     
     # Console handler

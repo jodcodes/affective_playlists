@@ -24,7 +24,7 @@ _project_root = os.path.join(os.path.dirname(__file__), '..', '..')
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-from shared.apple_music import AppleMusicInterface
+from apple_music import AppleMusicInterface
 
 # Add src to path for local imports
 sys.path.insert(0, os.path.dirname(__file__))
@@ -77,7 +77,7 @@ class MetadataFiller:
     def _load_whitelist():
         """Load centralized whitelist configuration"""
         try:
-            from shared.config import load_centralized_whitelist
+            from config import load_centralized_whitelist
             return load_centralized_whitelist(enabled_by_default=False)
         except ImportError:
             return False, set()

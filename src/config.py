@@ -90,10 +90,10 @@ def get_filtered_playlists(playlist_names: List[str]) -> List[str]:
     """
     Convenience function that loads whitelist and filters playlists in one call.
     
-    This is the recommended way for subrepos to filter playlists:
+    This is the recommended way for modules to filter playlists:
     
     Usage:
-        from shared.config import get_filtered_playlists
+        from config import get_filtered_playlists
         
         playlists = api.get_playlists()
         filtered = get_filtered_playlists(playlists)
