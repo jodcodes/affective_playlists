@@ -26,9 +26,7 @@ class MetadataField(Enum):
     BPM = "bpm"
     GENRE = "genre"
     YEAR = "year"
-    
-    
-    
+    COMPOSER = "composer"
 
 
 class DatabaseSource(Enum):
@@ -216,7 +214,8 @@ class MetadataRequirements:
     ENRICHABLE_FIELDS = {
         MetadataField.BPM: "Beats per minute (preferably from AcousticBrainz)",
         MetadataField.GENRE: "Genre classification (from multiple sources)",
-        MetadataField.YEAR: "Release year (from MusicBrainz/Discogs/Wikidata)"
+        MetadataField.YEAR: "Release year (from MusicBrainz/Discogs/Wikidata)",
+        MetadataField.COMPOSER: "Composer/Songwriter information"
     }
 
     def check_metadata_completeness(self, metadata: Dict[str, str]) \
@@ -231,8 +230,10 @@ class MetadataRequirements:
         missing = []
 
         for field in MetadataField:
-            value = metadata.get(field.value, "").strip()
-            if value:
+            # Consider a field complete only if it has a non-empty value
+            # Special handling: 0 or "0" values mean the field is missing
+            value = str(metadata.get(field.value, "")).strip()
+            if value and value not in ["0", "0.0"]:
                 complete.append(field)
             else:
                 missing.append(field)

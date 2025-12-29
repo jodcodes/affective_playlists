@@ -13,32 +13,56 @@ on getPlaylistTracksByPID(playlistPID)
 			set trackList to {}
 			
 			repeat with t in tracks of p
-				set tname to name of t
-				if tname is missing value then set tname to ""
-				
-				set tartist to artist of t
-				if tartist is missing value then set tartist to ""
-				
-				set talbum to album of t
-				if talbum is missing value then set talbum to ""
-				
-				set tgenre to genre of t
-				if tgenre is missing value then set tgenre to ""
-				
-				set tbpm to bpm of t
-				if tbpm is missing value then set tbpm to ""
-				
-				set tyear to year of t
-				if tyear is missing value then set tyear to ""
-				
-				set tcomposer to composer of t
-				if tcomposer is missing value then set tcomposer to ""
-				
-				set tduration to duration of t
-				if tduration is missing value then set tduration to ""
-				
-				-- Track als Record (JSON-ähnlich)
-				set end of trackList to {playlistID:pid, trackID:(persistent ID of t), name:tname, artist:tartist, album:talbum, genre:tgenre, bpm:tbpm, year:tyear, composer:tcomposer, duration:tduration}
+				-- Check cloud status: only process uploaded or matched tracks
+				set cloudStatus to cloud status of t
+				if cloudStatus is uploaded or cloudStatus is matched then
+					set tname to name of t
+					if tname is missing value then set tname to ""
+					
+					set tartist to artist of t
+					if tartist is missing value then set tartist to ""
+					
+					set talbum to album of t
+					if talbum is missing value then set talbum to ""
+					
+					set tgenre to genre of t
+					if tgenre is missing value then set tgenre to ""
+					
+					set tbpm to bpm of t
+					if tbpm is missing value then set tbpm to ""
+					
+					set tyear to year of t
+					if tyear is missing value then set tyear to ""
+					
+					set tcomposer to composer of t
+					if tcomposer is missing value then set tcomposer to ""
+					
+					set tduration to duration of t
+					if tduration is missing value then set tduration to ""
+					
+					-- Get location (file path) as POSIX path
+					set tlocation to ""
+					try
+						tell application "Music"
+							set tfile to (location of t)
+							if tfile is not missing value then
+								set tlocation to (POSIX path of tfile)
+							end if
+						end tell
+					end try
+					if tlocation is missing value then set tlocation to ""
+					
+					-- Convert cloud status constant to text for transmission
+					set tcloudStatus to ""
+					if cloudStatus is uploaded then
+						set tcloudStatus to "uploaded"
+					else if cloudStatus is matched then
+						set tcloudStatus to "matched"
+					end if
+					
+					-- Track als Record (JSON-ähnlich)
+					set end of trackList to {name:tname, id:(persistent ID of t), artist:tartist, album:talbum, genre:tgenre, bpm:tbpm, year:tyear, composer:tcomposer, duration:tduration, cloudStatus:tcloudStatus, filepath:tlocation}
+				end if
 			end repeat
 		end tell
 		

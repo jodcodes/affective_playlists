@@ -18,6 +18,7 @@ import logging
 from typing import List, Optional, Dict
 import argparse
 from dataclasses import dataclass
+from tqdm import tqdm
 
 # Add project root to path for shared imports
 _project_root = os.path.join(os.path.dirname(__file__), '..', '..')
@@ -54,9 +55,9 @@ class MetadataFiller:
             logger: Optional logger instance
         """
         self.logger = logger or logging.getLogger(__name__)
-        # Point to shared scripts directory
-        shared_scripts = os.path.join(os.path.dirname(__file__), '..', '..', 'shared', 'scripts')
-        self.apple_music = AppleMusicInterface(shared_scripts)
+        # Point to scripts directory in src/scripts
+        scripts_dir = os.path.join(os.path.dirname(__file__), 'scripts')
+        self.apple_music = AppleMusicInterface(scripts_dir)
         self.tag_manager = TagManager()
         self.enricher = MetadataEnricher(logger)
         self.detector = DownloadedTrackDetector()
@@ -83,10 +84,10 @@ class MetadataFiller:
             return False, set()
     
     def _load_playlist_folders_config(self) -> dict:
-        """Load playlist folders config from shared directory"""
+        """Load playlist folders config from data directory"""
         try:
             import json
-            config_path = os.path.join(os.path.dirname(__file__), '..', '..', 'shared', 'config', 'playlist_folders.json')
+            config_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'config', 'playlist_folders.json')
             with open(config_path, 'r') as f:
                 return json.load(f)
         except Exception as e:
@@ -99,7 +100,8 @@ class MetadataFiller:
             return self._playlist_ids_cache
         
         try:
-            script_path = os.path.join(os.path.dirname(self.apple_music.scripts_dir), '..', 'scripts', 'get_ids_playlists.applescript')
+            # self.apple_music.scripts_dir is already pointing to the scripts directory
+            script_path = os.path.join(self.apple_music.scripts_dir, 'get_ids_playlists.applescript')
             import subprocess
             result = subprocess.run(['osascript', script_path], capture_output=True, text=True, timeout=30)
             
@@ -107,12 +109,24 @@ class MetadataFiller:
                 self.logger.error("Failed to get playlist IDs")
                 return {}
             
-            # Parse output: name:..., id:...
+            # Parse output: name:VALUE, id:HEXID
+            # The output is all on one line, IDs are always 16 hex digits
+            # So we can match name: followed by anything until , id:HEXID
             import re
             playlists = {}
-            matches = re.findall(r"name:'([^']+)',\s*id:([A-F0-9]+)", result.stdout)
+            
+            # Pattern: name:ANYTHING, id:16HEXDIGITS
+            # Use non-greedy matching with [^}] to stop at the next id:
+            pattern = r'name:([^}]+?),\s*id:([A-F0-9]{16})'
+            matches = re.findall(pattern, result.stdout)
             
             for name, pid in matches:
+                name = name.strip()
+                # Remove quotes if present
+                if name.startswith("'") and name.endswith("'"):
+                    name = name[1:-1]
+                elif name.startswith("\"") and name.endswith("\""):
+                    name = name[1:-1]
                 playlists[name] = pid
             
             self._playlist_ids_cache = playlists
@@ -133,9 +147,8 @@ class MetadataFiller:
         Returns:
             Dictionary with results
         """
-        self.logger.info(f"Filling metadata for playlist: {playlist_name}")
-        
         # Get playlist ID
+        print(f"\nLoading playlist: {playlist_name}...")
         playlist_ids = self._get_playlist_ids()
         playlist_id = playlist_ids.get(playlist_name)
         
@@ -158,7 +171,7 @@ class MetadataFiller:
     def _get_playlist_tracks_by_id(self, playlist_id: str) -> Optional[List[Dict]]:
         """Get tracks from a playlist using persistent ID"""
         try:
-            script_path = os.path.join(os.path.dirname(self.apple_music.scripts_dir), '..', 'scripts', 'get_tracks_info_playlists.applescript')
+            script_path = os.path.join(self.apple_music.scripts_dir, 'get_tracks_info_playlists.applescript')
             import subprocess
             result = subprocess.run(['osascript', script_path, playlist_id], capture_output=True, text=True, timeout=60)
             
@@ -166,44 +179,58 @@ class MetadataFiller:
                 return None
             
             # Parse AppleScript record format
+            # Output is: name:X, id:Y, artist:Z, ... name:X2, id:Y2, artist:Z2, ...
+            # All on one or few lines, fields separated by ", "
             import re
             tracks = []
             seen = set()
             
-            # Split by "playlistID:" to separate tracks
-            track_strings = result.stdout.split('playlistID:')[1:]
+            # Split by "name:" to find track boundaries
+            # Each track starts with "name:"
+            parts = result.stdout.split('name:')
             
-            for track_str in track_strings:
-                try:
-                    track_dict = {}
-                    parts = track_str.split(', ')
-                    
-                    for part in parts:
-                        if ':' in part:
-                            key, val = part.split(':', 1)
-                            track_dict[key.strip()] = val.strip()
-                    
-                    track_name = track_dict.get('name', '')
-                    artist = track_dict.get('artist', '')
-                    
-                    if not track_name or not artist:
-                        continue
-                    
-                    track_key = f"{track_name}_{artist}".lower()
-                    if track_key in seen:
-                        continue
-                    
-                    seen.add(track_key)
-                    tracks.append(track_dict)
-                    
-                except Exception as e:
-                    self.logger.debug(f"Failed to parse track: {e}")
+            for i, part in enumerate(parts):
+                if not part.strip():
                     continue
+                
+                # For the first part (before first "name:"), skip it
+                if i == 0:
+                    continue
+                
+                # Now we have: "TrackName, id:ID, artist:Artist, ..."
+                # Extract all key:value pairs until the next "name:" (which is in the next iteration)
+                fields = {}
+                
+                # Split by ", " to get individual fields
+                field_parts = part.split(', ')
+                
+                # First field is the name (no key: prefix)
+                if field_parts:
+                    fields['name'] = field_parts[0].strip()
+                
+                # Parse remaining fields
+                for j in range(1, len(field_parts)):
+                    field_str = field_parts[j].strip()
+                    if ':' in field_str:
+                        key, val = field_str.split(':', 1)
+                        fields[key.strip()] = val.strip()
+                
+                # Check if this is a valid track
+                track_name = fields.get('name', '')
+                artist = fields.get('artist', '')
+                
+                if track_name and artist:
+                    track_key = f"{track_name}_{artist}".lower()
+                    if track_key not in seen:
+                        seen.add(track_key)
+                        tracks.append(fields)
             
             return tracks if tracks else None
             
         except Exception as e:
             self.logger.error(f"Error getting tracks by ID: {e}")
+            import traceback
+            traceback.print_exc()
             return None
 
     def fill_folder(self, folder_name: str, force: bool = False) -> Dict:
@@ -217,7 +244,7 @@ class MetadataFiller:
         Returns:
             Dictionary with results
         """
-        self.logger.info(f"Filling metadata for folder: {folder_name}")
+        print(f"\nLoading folder: {folder_name}...")
         
         # Resolve folder path
         folder_path = self._resolve_folder_path(folder_name)
@@ -248,19 +275,22 @@ class MetadataFiller:
         """
         results = {'success': True, 'processed': 0, 'enriched': 0, 'skipped': 0}
 
-        for i, track in enumerate(tracks, 1):
-            self.logger.debug(f"Processing track {i}/{len(tracks)}: {track.get('title')}")
+        for track in tqdm(tracks, desc="Processing tracks", unit="track"):
+            # Check cloud status: only process uploaded or matched tracks
+            cloud_status = track.get('cloudStatus', '')
+            if cloud_status and cloud_status not in ['uploaded', 'matched']:
+                results['skipped'] += 1
+                continue
             
             filepath = track.get('filepath')
             if not filepath or not self.detector.is_downloaded(filepath):
-                self.logger.debug(f"Skipping cloud-only track: {track.get('title')}")
                 results['skipped'] += 1
                 continue
 
             # Create track identifier
             track_id = TrackIdentifier(
                 artist=track.get('artist', ''),
-                title=track.get('title', ''),
+                title=track.get('name', ''),
                 album=track.get('album')
             )
 
@@ -282,15 +312,23 @@ class MetadataFiller:
             for entry in entries:
                 enriched.add_entry(entry)
 
-            # Write tags
+            # Write tags - only allow specific fields (year, bpm, genre, composer)
             if enriched.entries:
-                tags_to_write = {e.field.value: e.value for e in enriched.entries.values()}
-                success = self.tag_manager.write_tags(filepath, tags_to_write, force)
-                if success:
-                    self.logger.info(f"Enriched {len(tags_to_write)} fields: {track.get('title')}")
-                    results['enriched'] += 1
+                ALLOWED_FIELDS = {'year', 'bpm', 'genre', 'composer'}
+                tags_to_write = {
+                    e.field.value: e.value 
+                    for e in enriched.entries.values() 
+                    if e.field.value in ALLOWED_FIELDS
+                }
+                if tags_to_write:
+                    success = self.tag_manager.write_tags(filepath, tags_to_write, force)
+                    if success:
+                        self.logger.info(f"Enriched {len(tags_to_write)} fields: {track.get('name')}")
+                        results['enriched'] += 1
+                    else:
+                        self.logger.warning(f"Failed to write tags: {track.get('name')}")
+                        results['skipped'] += 1
                 else:
-                    self.logger.warning(f"Failed to write tags: {track.get('title')}")
                     results['skipped'] += 1
             else:
                 results['skipped'] += 1
@@ -312,9 +350,7 @@ class MetadataFiller:
         """
         results = {'success': True, 'processed': 0, 'enriched': 0, 'skipped': 0}
 
-        for i, filepath in enumerate(audio_files, 1):
-            self.logger.debug(f"Processing file {i}/{len(audio_files)}: {filepath}")
-
+        for filepath in tqdm(audio_files, desc="Processing files", unit="file"):
             # Read current tags
             current_tags = self.tag_manager.read_tags(filepath)
             
@@ -322,7 +358,6 @@ class MetadataFiller:
             title = current_tags.get('title', '')
 
             if not artist or not title:
-                self.logger.debug(f"Missing artist/title: {filepath}")
                 results['skipped'] += 1
                 continue
 
@@ -342,15 +377,23 @@ class MetadataFiller:
             for entry in entries:
                 enriched.add_entry(entry)
 
-            # Write tags
+            # Write tags - only allow specific fields (year, bpm, genre, composer)
             if enriched.entries:
-                tags_to_write = {e.field.value: e.value for e in enriched.entries.values()}
-                success = self.tag_manager.write_tags(filepath, tags_to_write, force)
-                if success:
-                    self.logger.info(f"Enriched {len(tags_to_write)} fields: {title}")
-                    results['enriched'] += 1
+                ALLOWED_FIELDS = {'year', 'bpm', 'genre', 'composer'}
+                tags_to_write = {
+                    e.field.value: e.value 
+                    for e in enriched.entries.values() 
+                    if e.field.value in ALLOWED_FIELDS
+                }
+                if tags_to_write:
+                    success = self.tag_manager.write_tags(filepath, tags_to_write, force)
+                    if success:
+                        self.logger.info(f"Enriched {len(tags_to_write)} fields: {title}")
+                        results['enriched'] += 1
+                    else:
+                        self.logger.warning(f"Failed to write tags: {title}")
+                        results['skipped'] += 1
                 else:
-                    self.logger.warning(f"Failed to write tags: {title}")
                     results['skipped'] += 1
             else:
                 results['skipped'] += 1
@@ -415,9 +458,9 @@ class MetadataFillCLI:
     def __init__(self):
         self.logger = self._setup_logging()
         self.filler = MetadataFiller(self.logger)
-        # Point to shared scripts directory
-        shared_scripts = os.path.join(os.path.dirname(__file__), '..', '..', 'shared', 'scripts')
-        self.apple_music = AppleMusicInterface(shared_scripts)
+        # Point to scripts directory in src/scripts
+        scripts_dir = os.path.join(os.path.dirname(__file__), 'scripts')
+        self.apple_music = AppleMusicInterface(scripts_dir)
 
     def _setup_logging(self) -> logging.Logger:
         """Setup logging for CLI."""

@@ -230,12 +230,13 @@ def organize_classified_playlists(classification_results: Dict[str, tuple],
     return organization_results
 
 
-def get_user_playlist_selection(apple_music: AppleMusicInterface) -> Optional[List[str]]:
+def get_user_playlist_selection(apple_music: AppleMusicInterface, whitelist_only: bool = False) -> Optional[List[str]]:
     """
     Get playlist selection from user via interactive menu.
     
     Args:
         apple_music: Apple Music interface instance
+        whitelist_only: If True, only show whitelisted playlists regardless of whitelist setting
         
     Returns:
         List of selected playlist names or None if cancelled
@@ -251,10 +252,14 @@ def get_user_playlist_selection(apple_music: AppleMusicInterface) -> Optional[Li
         # Load whitelist configuration
         whitelist_enabled, whitelist = load_centralized_whitelist()
         
-        # Filter playlists by whitelist if enabled
-        if whitelist_enabled:
+        # Determine which playlists to show
+        if whitelist_only or whitelist_enabled:
             playlist_names = [name for name in all_playlist_names if name in whitelist]
-            print(f"Whitelist enabled: Found {len(playlist_names)} whitelisted playlists out of {len(all_playlist_names)} total")
+            
+            if whitelist_only:
+                print(f"Whitelist mode: Showing {len(playlist_names)} whitelisted playlists out of {len(all_playlist_names)} total")
+            else:
+                print(f"Whitelist enabled: Found {len(playlist_names)} whitelisted playlists out of {len(all_playlist_names)} total")
             
             if not playlist_names:
                 print("No whitelisted playlists found.")
@@ -265,7 +270,8 @@ def get_user_playlist_selection(apple_music: AppleMusicInterface) -> Optional[Li
         
         # Show playlist selection menu
         print("\n" + "="*70)
-        print("PLAYLIST SELECTION" + (f" (Whitelist: {'ON' if whitelist_enabled else 'OFF'})" if whitelist_enabled else ""))
+        mode_text = "WHITELIST-ONLY" if whitelist_only else (f"WHITELIST: {'ON' if whitelist_enabled else 'OFF'}")
+        print(f"PLAYLIST SELECTION ({mode_text})")
         print("="*70 + "\n")
         
         for idx, name in enumerate(playlist_names, 1):
@@ -285,6 +291,7 @@ def get_user_playlist_selection(apple_music: AppleMusicInterface) -> Optional[Li
                 return None
             
             if user_input == 'all':
+                print(f"\nSelected all {len(playlist_names)} playlists")
                 return playlist_names
             
             try:
@@ -308,9 +315,9 @@ def get_user_playlist_selection(apple_music: AppleMusicInterface) -> Optional[Li
         return None
 
 
-def run_playlist_organization(dry_run: bool = True, verbose: bool = False, 
+def run_playlist_organization(dry_run: bool = False, verbose: bool = False, 
                             interactive: bool = True, playlist_names: List[str] = None,
-                            ignore_whitelist: bool = False) -> int:
+                            ignore_whitelist: bool = False, select_from_whitelist: bool = False) -> int:
     """
     Main function to run playlist organization and classification.
     
@@ -351,8 +358,14 @@ def run_playlist_organization(dry_run: bool = True, verbose: bool = False,
     if playlist_names:
         selected_playlists = playlist_names
         logger.info(f"Processing {len(selected_playlists)} pre-selected playlists")
+    elif select_from_whitelist:
+        # Force interactive mode with whitelist only
+        selected_playlists = get_user_playlist_selection(apple_music, whitelist_only=True)
+        if not selected_playlists:
+            print("No playlists selected. Exiting.")
+            return 0
     elif interactive:
-        selected_playlists = get_user_playlist_selection(apple_music)
+        selected_playlists = get_user_playlist_selection(apple_music, whitelist_only=False)
         if not selected_playlists:
             print("No playlists selected. Exiting.")
             return 0
@@ -449,7 +462,7 @@ def main(args=None):
     parser.add_argument(
         '--no-interactive',
         action='store_true',
-        help='Non-interactive mode: process all playlists without user selection'
+        help='Non-interactive mode: process all whitelisted playlists (or all if whitelist disabled)'
     )
     
     parser.add_argument(
@@ -469,6 +482,12 @@ def main(args=None):
         '--show-whitelist',
         action='store_true',
         help='Show current whitelist configuration and exit'
+    )
+    
+    parser.add_argument(
+        '--select-from-whitelist',
+        action='store_true',
+        help='Interactive selection from whitelisted playlists only'
     )
     
     parsed_args = parser.parse_args(args)
@@ -494,8 +513,8 @@ def main(args=None):
             print(f"Error loading whitelist: {e}")
             return 1
     
-    # Determine interactive mode
-    interactive = not parsed_args.no_interactive
+    # Determine interactive mode and selection type
+    interactive = not parsed_args.no_interactive and not parsed_args.select_from_whitelist
     
     # Use provided playlist names if specified
     playlist_names = parsed_args.playlist
@@ -506,7 +525,8 @@ def main(args=None):
         verbose=parsed_args.verbose,
         interactive=interactive,
         playlist_names=playlist_names,
-        ignore_whitelist=parsed_args.ignore_whitelist
+        ignore_whitelist=parsed_args.ignore_whitelist,
+        select_from_whitelist=parsed_args.select_from_whitelist
     )
 
 

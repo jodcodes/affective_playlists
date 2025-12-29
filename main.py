@@ -59,7 +59,7 @@ except ImportError as e:
 def run_temperament_analysis(args=None):
     """Run 4tempers - AI temperament analysis."""
     print("\n" + "="*70)
-    print("🎵 TEMPERAMENT ANALYSIS - AI-based Playlist Emotion Classification")
+    print("TEMPERAMENT ANALYSIS - AI-based Playlist Emotion Classification")
     print("="*70 + "\n")
     
     try:
@@ -85,23 +85,59 @@ def run_temperament_analysis(args=None):
 def run_metadata_enrichment(args=None):
     """Run metad_enr - metadata enrichment."""
     print("\n" + "="*70)
-    print("📝 METADATA ENRICHMENT - Fill Missing Audio Metadata")
+    print("METADATA ENRICHMENT - Fill Missing Audio Metadata")
     print("="*70 + "\n")
     
     try:
+        from metadata_fill import MetadataFillCLI
+        import argparse
+        
+        # Create interactive menu
+        print("What would you like to enrich metadata for?")
+        print("1. Playlist")
+        print("2. Folder")
+        choice = input("Enter your choice (1 or 2): ").strip()
+        
         cli = MetadataFillCLI()
-        cli.run()
-        return 0
+        
+        # Create args namespace
+        args_ns = argparse.Namespace()
+        args_ns.force = False
+        args_ns.verbose = False
+        
+        if choice == "1":
+            playlist_name = input("Enter playlist name: ").strip()
+            if not playlist_name:
+                print("ERROR: Playlist name required")
+                return 1
+            args_ns.playlist = playlist_name
+            args_ns.folder = None
+        elif choice == "2":
+            folder_path = input("Enter folder path or name: ").strip()
+            if not folder_path:
+                print("ERROR: Folder path required")
+                return 1
+            args_ns.playlist = None
+            args_ns.folder = folder_path
+        else:
+            print("ERROR: Invalid choice")
+            return 1
+        
+        exit_code = cli.run(args_ns)
+        return exit_code
+        
     except Exception as e:
         logger.error(f"Metadata enrichment failed: {e}")
         print(f"ERROR: {e}")
+        import traceback
+        traceback.print_exc()
         return 1
 
 
 def run_playlist_organization(args=None):
     """Run plsort - playlist organization by genre."""
     print("\n" + "="*70)
-    print("📁 PLAYLIST ORGANIZATION - Classify & Organize by Genre")
+    print("PLAYLIST ORGANIZATION - Classify & Organize by Genre")
     print("="*70 + "\n")
     
     try:
@@ -118,11 +154,16 @@ def run_playlist_organization(args=None):
         else:
             print("Whitelist is DISABLED - all playlists will be processed")
         
-        print("\nRunning in DRY-RUN mode by default (no changes will be made)")
-        print("To actually move playlists, use: python src/plsort.py (without --dry-run)")
+        print("\nIMPORTANT: This will ACTUALLY MOVE playlists in Apple Music!")
+        print("For safety, add --dry-run to test without making changes.\n")
+        print("For more control, use plsort directly:")
+        print("  python src/plsort.py --select-from-whitelist  # Choose specific whitelisted playlists")
+        print("  python src/plsort.py --dry-run              # All whitelisted playlists (dry-run)")
+        print("  python src/plsort.py                        # Interactive mode")
+        print("  python src/plsort.py --ignore-whitelist     # Process all playlists")
         
-        # Run plsort with dry-run mode enabled by default for main.py integration
-        result = plsort_module.main(args=['--dry-run', '--no-interactive'])
+        # Run plsort with default settings (will actually move playlists)
+        result = plsort_module.main(args=['--no-interactive'])
         return result if result is not None else 0
     except Exception as e:
         logger.error(f"Playlist organization failed: {e}")
@@ -133,14 +174,14 @@ def run_playlist_organization(args=None):
 def show_interactive_menu():
     """Show interactive menu to select and run a feature."""
     print("\n" + "="*70)
-    print("affective_playlists - Unified Music Analysis & Organization")
+    print("affective_playlists - Unified Music Library Organization")
     print("="*70)
     print("\nSelect a feature to run:\n")
     
     features = [
-        ("1", "temperament", "🎵 AI-based Playlist Temperament Analysis"),
-        ("2", "enrich", "📝 Metadata Filling and Enrichment"),
-        ("3", "organize", "📁 Playlist Organization and Classification"),
+        ("1", "temperament", "4 Temper Analysis"),
+        ("2", "enrich", "Metadata Enrichment"),
+        ("3", "organize", "Playlist Genre Sort"),
     ]
     
     for num, name, description in features:
@@ -154,7 +195,7 @@ def show_interactive_menu():
             choice = input("\nEnter your choice (0-3): ").strip()
             
             if choice == "0":
-                print("\nGoodbye! 👋\n")
+                print("\nGoodbye!")
                 return 0
             elif choice == "1":
                 return run_temperament_analysis()
@@ -165,7 +206,7 @@ def show_interactive_menu():
             else:
                 print("Invalid choice. Please enter 0-3.")
         except KeyboardInterrupt:
-            print("\n\nInterrupted by user. Goodbye! 👋\n")
+            print("\n\nInterrupted by user. Goodbye!\n")
             return 130
 
 

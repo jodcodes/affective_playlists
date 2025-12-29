@@ -21,7 +21,7 @@ class PlaylistManager:
     Manager for Apple Music playlist operations including folder creation and playlist moving.
     """
     
-    def __init__(self, dry_run: bool = True, scripts_dir: str = "scripts"):
+    def __init__(self, dry_run: bool = False, scripts_dir: str = "scripts"):
         """
         Initialize playlist manager.
         
