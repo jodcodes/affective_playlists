@@ -92,6 +92,9 @@ def run_metadata_enrichment(args=None):
         from metadata_fill import MetadataFillCLI
         import argparse
         
+        # Check if whitelist is enabled
+        whitelist_enabled, whitelist = load_centralized_whitelist()
+        
         # Create interactive menu
         print("What would you like to enrich metadata for?")
         print("1. Playlist")
@@ -106,7 +109,33 @@ def run_metadata_enrichment(args=None):
         args_ns.verbose = False
         
         if choice == "1":
-            playlist_name = input("Enter playlist name: ").strip()
+            # Check if whitelist is enabled
+            if whitelist_enabled and whitelist:
+                print(f"\nWhitelist enabled with {len(whitelist)} playlists.")
+                print("\nChoose a playlist:")
+                print("0. Enter playlist name manually")
+                
+                whitelist_list = sorted(list(whitelist))
+                for i, pl_name in enumerate(whitelist_list, 1):
+                    print(f"{i}. {pl_name}")
+                
+                pl_choice = input("\nEnter playlist number or 0 for manual entry: ").strip()
+                
+                try:
+                    pl_idx = int(pl_choice)
+                    if pl_idx == 0:
+                        playlist_name = input("Enter playlist name: ").strip()
+                    elif 1 <= pl_idx <= len(whitelist_list):
+                        playlist_name = whitelist_list[pl_idx - 1]
+                    else:
+                        print("ERROR: Invalid playlist number")
+                        return 1
+                except ValueError:
+                    print("ERROR: Invalid input")
+                    return 1
+            else:
+                playlist_name = input("Enter playlist name: ").strip()
+            
             if not playlist_name:
                 print("ERROR: Playlist name required")
                 return 1
