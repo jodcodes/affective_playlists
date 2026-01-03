@@ -74,6 +74,7 @@ class MetadataFiller:
         self.tag_manager = TagManager()
         self.enricher = MetadataEnricher(logger)
         self.detector = DownloadedTrackDetector()
+        self.cover_art_manager = CoverArtManager(logger=logger)
         
         # Load API credentials from environment
         lastfm_key = os.getenv('LASTFM_API_KEY')
@@ -449,6 +450,21 @@ class MetadataFiller:
                     results['skipped'] += 1
             else:
                 results['skipped'] += 1
+            
+            # Embed cover art if MusicBrainz ID available
+            if current_tags.get('musicbrainz_release_id'):
+                mbid = current_tags.get('musicbrainz_release_id')
+                try:
+                    cover_success = self.cover_art_manager.enrich_with_cover_art(
+                        filepath,
+                        mbid=mbid,
+                        artist=artist,
+                        album=current_tags.get('album')
+                    )
+                    if cover_success:
+                        self.logger.debug(f"Cover art embedded: {title}")
+                except Exception as e:
+                    self.logger.debug(f"Cover art embedding failed for {title}: {e}")
 
             results['processed'] += 1
 

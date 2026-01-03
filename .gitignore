@@ -1,6 +1,6 @@
 # Git ignore for affective_playlists
 todo
-docs/
+#docs/
 
 # Examples (local use only)
 playlists_folders.json
