@@ -68,20 +68,30 @@ Fill gaps in music metadata across user's library by querying multiple sources (
 
 ### T4: Database Queries
 
-**Query Order (Priority):**
-1. **MusicBrainz** - Primary source for track metadata, BPM, year, release ID (for cover art)
-2. **CoverArtArchive** - Cover art from MusicBrainz release ID (via MusicBrainz API)
-3. **AcousticBrainz** - Audio analysis data (BPM, key, tempo) from MusicBrainz ID
-4. **Discogs** - Genre, year, release information (cover art requires API token)
-5. **Wikidata** - Genre, year, artist information
-6. **Last.fm** - Genre tags, popularity, user-generated classification (cover art requires API key)
+**Query Order (Priority) - "Enrich Once" Strategy:**
+1. **Discogs** - Genre, year, release information (cover art requires API token)
+2. **Last.fm** - Genre tags, popularity, user-generated classification
+3. **Wikidata** - Genre, year, artist information
+4. **MusicBrainz** - Track metadata, BPM, year, release ID
+5. **AcousticBrainz** - Audio analysis data (BPM, key, tempo) from MusicBrainz ID
+6. **CoverArtArchive** - Cover art only (separate flow, never required for metadata enrichment)
+
+**Enrich Once Behavior (Per-Field Strategy):**
+- For each FIELD (BPM, Genre, Year, etc.), uses first source that has it
+- Discogs returns Genre + Year → uses those
+- Last.fm returns different Genre → skips (already have Genre from Discogs)
+- Continues querying sources until all fields found OR all sources exhausted
+- **Ensures NO SONGS ARE SKIPPED** - enriches all available metadata
+- Each field enriched once from the highest-priority source that has it
+- Improves performance while ensuring complete enrichment
 
 Each database:
-- MusicBrainz: Track search, metadata retrieval, MBID lookup
-- AcousticBrainz: Audio analysis data (requires MusicBrainz ID)
-- Discogs: Genre, release year, catalog information
-- Wikidata: Genre, release year, artist/track relationships
+- Discogs: Genre, release year, catalog information (first queried)
 - Last.fm: Genre tags, track popularity, user classifications
+- Wikidata: Genre, release year, artist/track relationships
+- MusicBrainz: Track search, metadata retrieval, MBID lookup
+- AcousticBrainz: Audio analysis data (requires MusicBrainz ID, queried last)
+- CoverArtArchive: Only for cover art (separate workflow)
 
 ### T5: Configuration
 - Whitelist enabled flag in `data/config/whitelist.json`

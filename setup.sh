@@ -16,7 +16,7 @@ NC='\033[0m' # No Color
 
 echo -e "${BLUE}╔═════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║         plMetaTemp - Unified Setup Script                   ║${NC}"
-echo -e "${BLUE}║  4tempers | metad_enr | plsort                             ║${NC}"
+echo -e "${BLUE}║           4tempers | metad_enr | plsort                     ║${NC}"
 echo -e "${BLUE}╚═════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 

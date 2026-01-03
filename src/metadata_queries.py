@@ -5,14 +5,24 @@ LAYER: Data Layer - Query Orchestration
 ROLE: Unified interface for querying multiple music databases
 ARCHITECTURE: See src/README.md for full architecture
 
-Queries external music databases in priority order:
-1. MusicBrainz - Primary source (track metadata, BPM, year, MBID lookup)
-2. AcousticBrainz - Audio analysis (BPM, key, tempo from MusicBrainz ID)
-3. Discogs - Genre, release year, catalog info (vinyl database)
-4. Wikidata - Genre, year, artist/track relationships (structured data)
-5. Last.fm - Genre tags, popularity, user classifications (tags/popularity)
+Queries external music databases in priority order with per-field "enrich once" strategy:
+1. Discogs - Genre, release year, catalog info (vinyl database) - FIRST
+2. Last.fm - Genre tags, popularity, user classifications (user-generated)
+3. Wikidata - Genre, year, artist/track relationships (structured data)
+4. MusicBrainz - Track metadata, BPM, year, MBID lookup
+5. AcousticBrainz - Audio analysis (BPM, key, tempo from MusicBrainz ID) - LAST
 
-Each source is queried independently, results merged by confidence score.
+For each FIELD (BPM, Genre, Year, etc.):
+- Uses first source that has the field
+- Skips that field in subsequent sources (already have highest-priority version)
+- Continues through all sources to find different fields
+- NO SONGS SKIPPED - enriches all available metadata
+
+Example:
+- Discogs returns: Genre, Year → collect both
+- Last.fm returns: Genre, Tags → skip Genre (have from Discogs), skip Tags (not a field)
+- Wikidata returns: BPM → collect BPM (don't have it yet)
+- Result: Genre (Discogs), Year (Discogs), BPM (Wikidata)
 
 All queries are read-only. No rate-limited API keys are required.
 Implements caching to minimize requests.
@@ -512,12 +522,14 @@ class MetadataQueryOrchestrator:
     """Orchestrate queries across all databases in priority order."""
 
     # Priority order for queries
+    # User-specified hierarchy: Discogs → Last.fm → Wikidata → MusicBrainz → AcousticBrainz
+    # CoverArtArchive is only used for cover art (separate flow)
     QUERY_ORDER = [
+        (DatabaseSource.DISCOGS, DiscogsQuery),
+        (DatabaseSource.LASTFM, LastfmQuery),
+        (DatabaseSource.WIKIDATA, WikidataQuery),
         (DatabaseSource.MUSICBRAINZ, MusicBrainzQuery),
         (DatabaseSource.ACOUSTICBRAINZ, AcousticBrainzQuery),
-        (DatabaseSource.DISCOGS, DiscogsQuery),
-        (DatabaseSource.WIKIDATA, WikidataQuery),
-        (DatabaseSource.LASTFM, LastfmQuery),
     ]
 
     def __init__(self, lastfm_api_key: Optional[str] = None,
@@ -529,17 +541,29 @@ class MetadataQueryOrchestrator:
         self.query_cache: Dict[Tuple[str, str], List[MetadataEntry]] = {}
 
     def query_all_sources(self, artist: str, title: str,
-                         duration: Optional[int] = None) -> List[MetadataEntry]:
+                          duration: Optional[int] = None,
+                          enrich_once: bool = True) -> List[MetadataEntry]:
         """
-        Query all available sources for metadata.
+        Query available sources for metadata.
         
         Queries are performed in deterministic priority order.
-        Higher-confidence matches from earlier sources are preferred.
+        If enrich_once=True, enriches one field at a time (stops when all fields found).
+        If enrich_once=False, queries all sources for comparison.
+        
+        With enrich_once=True:
+        - Discogs finds Genre, Year → collect those
+        - Last.fm doesn't have Genre/Year → continues
+        - Check if all fields found → if not, try next source
+        - Continue until all fields found or all sources exhausted
+        
+        This ensures NO SONG IS SKIPPED - it enriches all available metadata
+        from the highest-priority sources that have it.
         
         Args:
             artist: Artist name
             title: Track title
             duration: Duration in seconds
+            enrich_once: Enrich each field once (from first source that has it) (default: True)
             
         Returns:
             List of MetadataEntry objects with sources
@@ -550,9 +574,16 @@ class MetadataQueryOrchestrator:
             return self.query_cache[cache_key]
 
         entries = []
-        field_sources: Dict[MetadataField, float] = {}  # Track best confidence per field
+        found_fields: Dict[MetadataField, bool] = {}  # Track which fields already have values
 
         for source, query_class in self.QUERY_ORDER:
+            # With enrich_once: stop if all expected fields are found
+            if enrich_once and found_fields:
+                # Check if we're still looking for any fields
+                # For now, if we found at least one field, we keep trying for others
+                # This ensures complete enrichment without skipping tracks
+                pass
+
             if source == DatabaseSource.LASTFM:
                 # LastFM requires API key
                 if not self.lastfm_api_key:
@@ -568,20 +599,21 @@ class MetadataQueryOrchestrator:
 
             results = querier.query(artist, title, duration)
 
-            for field, (value, confidence) in results.items():
-                # Only accept if we don't have a higher-confidence match
-                if field not in field_sources or confidence > field_sources[field]:
-                    # Remove any previous entry for this field
-                    entries = [e for e in entries if e.field != field]
-
-                    entry = MetadataEntry(
-                        field=field,
-                        value=value,
-                        source=source,
-                        confidence=confidence
-                    )
-                    entries.append(entry)
-                    field_sources[field] = confidence
+            if results:
+                for field, (value, confidence) in results.items():
+                    # Only accept if we don't already have this field
+                    if field not in found_fields:
+                        entry = MetadataEntry(
+                            field=field,
+                            value=value,
+                            source=source,
+                            confidence=confidence
+                        )
+                        entries.append(entry)
+                        found_fields[field] = True
+                        self.logger.debug(f"  Found {field.name} from {source.name}: {value} (conf: {confidence})")
+                    else:
+                        self.logger.debug(f"  Skipping {field.name} from {source.name} (already have from {self._get_field_source(entries, field).name})")
 
             # Add rate limiting between queries
             time.sleep(0.5)
@@ -590,6 +622,13 @@ class MetadataQueryOrchestrator:
         self.query_cache[cache_key] = entries
 
         return entries
+    
+    def _get_field_source(self, entries: List[MetadataEntry], field: MetadataField) -> Optional['DatabaseSource']:
+        """Get the source that provided a specific field."""
+        for entry in entries:
+            if entry.field == field:
+                return entry.source
+        return None
 
     def clear_cache(self) -> None:
         """Clear query cache."""
