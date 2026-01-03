@@ -11,6 +11,22 @@ from typing import Dict, List, Optional, Set
 from datetime import datetime
 import urllib.request
 import urllib.error
+import ssl
+
+# Fix SSL certificate verification for macOS Python 3.12+
+def _setup_ssl_context():
+    """Setup SSL context with proper certificate handling."""
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        try:
+            return ssl.create_default_context()
+        except:
+            # Last resort: Disable SSL verification (not ideal but allows queries)
+            return ssl._create_unverified_context()
+
+_SSL_CONTEXT = _setup_ssl_context()
 
 
 class WebDataFetcher:
@@ -63,7 +79,8 @@ class WebDataFetcher:
         try:
             headers = {'User-Agent': 'metad-fill/1.0'}
             req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req, timeout=timeout) as response:
+            # Use explicit SSL context to ensure certificates work
+            with urllib.request.urlopen(req, timeout=timeout, context=_SSL_CONTEXT) as response:
                 return response.read().decode('utf-8')
         except urllib.error.URLError as e:
             print(f"Warning: Could not fetch {url}: {e}")

@@ -1,15 +1,28 @@
 #!/usr/bin/env python3
 """
-Music Playlist Temperament Analyzer
+Music Playlist Temperament Analyzer (Feature: 4tempers).
+
+LAYER: Application Layer - Feature Implementation
+ROLE: Main orchestrator for temperament analysis
+ARCHITECTURE: See src/README.md for full architecture
 
 Categorizes macOS Music.app playlists into four temperament folders:
-- Woe (Melancholic) - sadness
-- Frolic (Sanguine) - joy
-- Dread (Phlegmatic) - fear
-- Malice (Choleric) - rage
+- Woe (Melancholic) - sadness, introspection, melancholy
+- Frolic (Sanguine) - joy, happiness, optimism, celebration
+- Dread (Phlegmatic) - fear, anxiety, tension, dramatic
+- Malice (Choleric) - rage, anger, intense, aggressive
 
 Uses LLM-based analysis of track metadata via native macOS AppleScript.
 No Apple developer account needed!
+
+IMPLEMENTATION FLOW:
+1. apple_music.py → Get playlist from Music.app
+2. For each track:
+   - llm_client.py → Send to LLM (OpenAI or Claude)
+   - prompts.py → Use temperament classification prompt
+   - Receive temperament classification
+3. playlist_manager.py → Create temperament folders
+4. apple_music.py → Move playlists to folders
 
 SETUP INSTRUCTIONS:
 1. Install dependencies:
@@ -17,6 +30,8 @@ SETUP INSTRUCTIONS:
 
 2. Create .env file with:
    OPENAI_API_KEY=your_openai_key
+   or
+   ANTHROPIC_API_KEY=your_anthropic_key
 
 3. Music.app must be installed (comes with macOS)
 

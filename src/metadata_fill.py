@@ -1,8 +1,13 @@
 """
-Metadata fill module for playlists.
+Metadata fill module for playlists (Feature: metad_enr).
+
+LAYER: Application Layer - Feature Implementation
+ROLE: Main orchestrator for metadata enrichment
+ARCHITECTURE: See src/README.md for full architecture
 
 Core functionality:
 - Fills missing metadata fields in playlists
+- Queries multiple databases (MusicBrainz → AcousticBrainz → Discogs → Wikidata → Last.fm)
 - Works with both internal module usage and CLI invocation
 - Integrates with Apple Music library
 - Supports both playlist and folder targets
@@ -10,6 +15,13 @@ Core functionality:
 This module can be:
 1. Imported and used internally: from metadata_fill import MetadataFiller
 2. Invoked from CLI: python -m metadata_fill --playlist "Favorites"
+
+Database Query Order (Priority):
+1. MusicBrainz - Primary source (track metadata, BPM, year)
+2. AcousticBrainz - Audio analysis (needs MusicBrainz ID)
+3. Discogs - Genre, release info (vinyl database)
+4. Wikidata - Structured data (artist/track relationships)
+5. Last.fm - User-generated tags (least reliable)
 """
 
 import sys
@@ -31,8 +43,9 @@ from apple_music import AppleMusicInterface
 sys.path.insert(0, os.path.dirname(__file__))
 from audio_tags import TagManager
 from metadata_enrichment import (
-    MetadataEnricher, DownloadedTrackDetector, TrackIdentifier
+    MetadataEnricher, DownloadedTrackDetector, TrackIdentifier, MetadataField
 )
+from cover_art import CoverArtManager
 from metadata_queries import MetadataQueryOrchestrator
 
 
@@ -61,7 +74,18 @@ class MetadataFiller:
         self.tag_manager = TagManager()
         self.enricher = MetadataEnricher(logger)
         self.detector = DownloadedTrackDetector()
-        self.query_orchestrator = MetadataQueryOrchestrator(logger=logger)
+        
+        # Load API credentials from environment
+        lastfm_key = os.getenv('LASTFM_API_KEY')
+        discogs_token = os.getenv('DISCOGS_TOKEN')
+        
+        # Initialize query orchestrator with credentials
+        self.query_orchestrator = MetadataQueryOrchestrator(
+            lastfm_api_key=lastfm_key,
+            discogs_token=discogs_token,
+            logger=logger
+        )
+        
         self.stats = {
             'processed': 0,
             'enriched': 0,
@@ -274,16 +298,26 @@ class MetadataFiller:
             Processing results
         """
         results = {'success': True, 'processed': 0, 'enriched': 0, 'skipped': 0}
+        
+        self.logger.info(f"Starting metadata enrichment for {len(tracks)} tracks")
 
         for track in tqdm(tracks, desc="Processing tracks", unit="track"):
+            track_name = track.get('name', 'Unknown')
+            artist_name = track.get('artist', 'Unknown')
+            track_num = results['processed'] + 1
+            
+            self.logger.debug(f"[{track_num}/{len(tracks)}] Processing: {artist_name} - {track_name}")
+            
             # Check cloud status: only process uploaded or matched tracks
             cloud_status = track.get('cloudStatus', '')
             if cloud_status and cloud_status not in ['uploaded', 'matched']:
+                self.logger.debug(f"  └─ Skipped: Cloud status is '{cloud_status}' (not uploaded/matched)")
                 results['skipped'] += 1
                 continue
             
             filepath = track.get('filepath')
             if not filepath or not self.detector.is_downloaded(filepath):
+                self.logger.debug(f"  └─ Skipped: File not downloaded or not found")
                 results['skipped'] += 1
                 continue
 
@@ -295,19 +329,24 @@ class MetadataFiller:
             )
 
             if not track_id.is_complete():
-                self.logger.debug(f"Incomplete track info: {track_id}")
+                self.logger.debug(f"  └─ Skipped: Incomplete track info (missing artist or title)")
                 results['skipped'] += 1
                 continue
 
-            # Enrich metadata
+            # Read current tags
             current_tags = self.tag_manager.read_tags(filepath)
+            self.logger.debug(f"  └─ Current tags: BPM={current_tags.get('bpm')}, Year={current_tags.get('year')}, Genre={current_tags.get('genre')}")
+            
+            # Enrich metadata
             enriched = self.enricher.enrich_track(filepath, current_tags, track_id, force)
 
             # Query databases
+            self.logger.debug(f"  └─ Querying databases for: {artist_name} - {track_name}")
             entries = self.query_orchestrator.query_all_sources(
                 track_id.artist,
                 track_id.title
             )
+            self.logger.debug(f"  └─ Found {len(entries)} metadata entries from databases")
 
             for entry in entries:
                 enriched.add_entry(entry)
@@ -321,20 +360,33 @@ class MetadataFiller:
                     if e.field.value in ALLOWED_FIELDS
                 }
                 if tags_to_write:
+                    fields_str = ', '.join([f"{k}={v}" for k, v in tags_to_write.items()])
+                    self.logger.debug(f"  └─ Writing {len(tags_to_write)} fields: {fields_str}")
                     success = self.tag_manager.write_tags(filepath, tags_to_write, force)
                     if success:
-                        self.logger.info(f"Enriched {len(tags_to_write)} fields: {track.get('name')}")
+                        self.logger.info(f"  ✓ ENRICHED: {artist_name} - {track_name} ({fields_str})")
                         results['enriched'] += 1
                     else:
-                        self.logger.warning(f"Failed to write tags: {track.get('name')}")
+                        self.logger.warning(f"  ✗ FAILED to write tags: {artist_name} - {track_name}")
                         results['skipped'] += 1
                 else:
+                    self.logger.debug(f"  └─ Skipped: No writable fields available")
                     results['skipped'] += 1
             else:
+                self.logger.debug(f"  └─ Skipped: No enrichment data found")
                 results['skipped'] += 1
 
             results['processed'] += 1
 
+        self.logger.info(f"\n{'='*80}")
+        self.logger.info(f"Metadata Enrichment Complete")
+        self.logger.info(f"{'='*80}")
+        self.logger.info(f"Total Processed: {results['processed']} tracks")
+        self.logger.info(f"Successfully Enriched: {results['enriched']} tracks")
+        self.logger.info(f"Skipped: {results['skipped']} tracks")
+        self.logger.info(f"Log file: data/logs/metadata_enrichment.log")
+        self.logger.info(f"{'='*80}\n")
+        
         return results
 
     def _process_files(self, audio_files: List[str], force: bool = False) -> Dict:
@@ -463,12 +515,48 @@ class MetadataFillCLI:
         self.apple_music = AppleMusicInterface(scripts_dir)
 
     def _setup_logging(self) -> logging.Logger:
-        """Setup logging for CLI."""
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        """Setup logging for CLI with file and console output."""
+        import logging.handlers
+        from datetime import datetime
+        
+        # Create logs directory if it doesn't exist
+        logs_dir = os.path.join(os.path.dirname(__file__), '..', 'data', 'logs')
+        os.makedirs(logs_dir, exist_ok=True)
+        
+        # Create logger
+        logger = logging.getLogger('metadata_fill')
+        logger.setLevel(logging.DEBUG)
+        
+        # Remove any existing handlers to avoid duplicates
+        logger.handlers = []
+        
+        # File handler - write to data/logs/metadata_enrichment.log
+        log_file = os.path.join(logs_dir, 'metadata_enrichment.log')
+        file_handler = logging.handlers.RotatingFileHandler(
+            log_file,
+            maxBytes=10*1024*1024,  # 10MB
+            backupCount=5
         )
-        return logging.getLogger('metadata_fill')
+        file_handler.setLevel(logging.DEBUG)
+        file_formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+        file_handler.setFormatter(file_formatter)
+        
+        # Console handler - INFO level for user-friendly output
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        console_formatter = logging.Formatter(
+            '%(levelname)s: %(message)s'
+        )
+        console_handler.setFormatter(console_formatter)
+        
+        # Add handlers to logger
+        logger.addHandler(file_handler)
+        logger.addHandler(console_handler)
+        
+        return logger
 
     def run(self, args: argparse.Namespace) -> int:
         """
@@ -480,6 +568,23 @@ class MetadataFillCLI:
         Returns:
             Exit code (0 = success, 1 = failure)
         """
+        # Set logging level based on verbosity
+        if hasattr(args, 'verbose') and args.verbose:
+            self.logger.setLevel(logging.DEBUG)
+            for handler in self.logger.handlers:
+                if isinstance(handler, logging.StreamHandler):
+                    handler.setLevel(logging.DEBUG)
+        
+        # Log start of operation
+        target = args.playlist if args.playlist else args.folder
+        self.logger.info(f"\n{'='*80}")
+        self.logger.info(f"METADATA ENRICHMENT STARTED")
+        self.logger.info(f"{'='*80}")
+        self.logger.info(f"Target: {target}")
+        self.logger.info(f"Force overwrite: {getattr(args, 'force', False)}")
+        self.logger.info(f"Verbose: {getattr(args, 'verbose', False)}")
+        self.logger.info(f"{'='*80}\n")
+        
         # Validate exactly one target is specified
         if args.playlist and args.folder:
             self.logger.error("Specify either --playlist or --folder, not both")

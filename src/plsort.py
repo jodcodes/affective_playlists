@@ -1,9 +1,21 @@
 #!/usr/bin/env python3
 """
-plsort - Playlist Organization and Classification
+plsort - Playlist Organization and Classification (Feature: plsort).
+
+LAYER: Application Layer - Feature Implementation
+ROLE: Main orchestrator for playlist genre classification and organization
+ARCHITECTURE: See src/README.md for full architecture
 
 Categorizes playlists by genre (world, electronic, jazz, disco/funk/soul, rock, hip-hop)
 using enhanced weighted scoring, artist lists, and metadata enrichment.
+
+IMPLEMENTATION FLOW:
+1. apple_music.py → Get playlist from Music.app
+2. For each track in playlist:
+   - playlist_classifier.py → Classify track genre
+3. Aggregate track classifications to playlist genre
+4. playlist_manager.py → Create genre folders
+5. apple_music.py → Move playlist to genre folder
 """
 
 import sys

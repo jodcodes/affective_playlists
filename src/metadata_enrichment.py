@@ -1,5 +1,9 @@
 """
-Metadata enrichment module for downloaded audio tracks.
+Metadata enrichment module for downloaded audio tracks (Data Layer).
+
+LAYER: Data Layer - Data Structures and Models
+ROLE: Core data classes for metadata enrichment pipeline
+ARCHITECTURE: See src/README.md for full architecture
 
 Enriches incomplete metadata (BPM, Genre, Year) for locally stored audio files
 by querying external music databases with deterministic priority ordering.
@@ -10,6 +14,13 @@ Flow:
 3. Query sources in priority order: MusicBrainz → AcousticBrainz → Discogs → Wikidata → Last.fm
 4. Merge results using fixed rules (exact matches preferred)
 5. Write tags back to audio files with source tracking
+
+Key Classes:
+- MetadataField: Enum of available metadata fields
+- DatabaseSource: Enum of available metadata sources
+- MetadataEntry: Single metadata result (value, source, confidence)
+- EnrichedMetadata: Collection of metadata entries for a track
+- TrackIdentifier: Track identification data (artist, title, duration)
 """
 
 from dataclasses import dataclass, field
@@ -27,6 +38,7 @@ class MetadataField(Enum):
     GENRE = "genre"
     YEAR = "year"
     COMPOSER = "composer"
+    COVER_ART = "cover_art"
 
 
 class DatabaseSource(Enum):

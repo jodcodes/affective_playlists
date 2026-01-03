@@ -106,7 +106,7 @@ def run_metadata_enrichment(args=None):
         # Create args namespace
         args_ns = argparse.Namespace()
         args_ns.force = False
-        args_ns.verbose = False
+        args_ns.verbose = os.getenv('VERBOSE', 'false').lower() == 'true'
         
         if choice == "1":
             # Check if whitelist is enabled

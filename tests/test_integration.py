@@ -15,8 +15,8 @@ import os
 from pathlib import Path
 
 # Add project root to path
-PROJECT_ROOT = Path(__file__).parent
-sys.path.insert(0, str(PROJECT_ROOT))
+PROJECT_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(PROJECT_ROOT / 'src'))
 
 # Colors for output
 GREEN = '\033[0;32m'
@@ -33,8 +33,8 @@ def print_section(title):
     print(f"{BLUE}{'='*70}{NC}\n")
 
 
-def test_result(name, passed, details=""):
-    """Print test result."""
+def print_test_result(name, passed, details=""):
+    """Print test result (helper function, not a test)."""
     status = f"{GREEN}✓ PASS{NC}" if passed else f"{RED}✗ FAIL{NC}"
     print(f"  {status} - {name}")
     if details:
@@ -57,7 +57,7 @@ def test_directory_structure():
     for dir_name, description in required_dirs:
         dir_path = PROJECT_ROOT / dir_name
         exists = dir_path.exists() and dir_path.is_dir()
-        test_result(description, exists, f"{dir_path}")
+        print_test_result(description, exists, f"{dir_path}")
         all_passed = all_passed and exists
     
     return all_passed
@@ -78,7 +78,7 @@ def test_shared_files():
     for file_path, description in required_files:
         full_path = PROJECT_ROOT / file_path
         exists = full_path.exists() and full_path.is_file()
-        test_result(description, exists, file_path)
+        print_test_result(description, exists, file_path)
         all_passed = all_passed and exists
     
     return all_passed
@@ -105,7 +105,7 @@ def test_root_files():
     for file_path, description in required_files:
         full_path = PROJECT_ROOT / file_path
         exists = full_path.exists() and full_path.is_file()
-        test_result(description, exists, file_path)
+        print_test_result(description, exists, file_path)
         all_passed = all_passed and exists
     
     return all_passed
@@ -120,33 +120,33 @@ def test_shared_imports():
     # Test importing from shared package
     try:
         from shared import AppleMusicInterface, TextNormalizer, setup_logger
-        test_result("Import from shared package", True)
+        print_test_result("Import from shared package", True)
     except ImportError as e:
-        test_result("Import from shared package", False, str(e))
+        print_test_result("Import from shared package", False, str(e))
         all_passed = False
     
     # Test importing AppleMusicInterface
     try:
         from shared.apple_music import AppleMusicInterface
-        test_result("Import AppleMusicInterface", True)
+        print_test_result("Import AppleMusicInterface", True)
     except ImportError as e:
-        test_result("Import AppleMusicInterface", False, str(e))
+        print_test_result("Import AppleMusicInterface", False, str(e))
         all_passed = False
     
     # Test importing TextNormalizer
     try:
         from shared.normalizer import TextNormalizer
-        test_result("Import TextNormalizer", True)
+        print_test_result("Import TextNormalizer", True)
     except ImportError as e:
-        test_result("Import TextNormalizer", False, str(e))
+        print_test_result("Import TextNormalizer", False, str(e))
         all_passed = False
     
     # Test importing setup_logger
     try:
         from shared.logger import setup_logger
-        test_result("Import setup_logger", True)
+        print_test_result("Import setup_logger", True)
     except ImportError as e:
-        test_result("Import setup_logger", False, str(e))
+        print_test_result("Import setup_logger", False, str(e))
         all_passed = False
     
     return all_passed
@@ -164,10 +164,10 @@ def test_shared_functionality():
         normalizer = TextNormalizer()
         result = normalizer.normalize("  HELLO & World!  ")
         passed = result == "hello and world"
-        test_result("TextNormalizer.normalize()", passed, f"Got: '{result}'")
+        print_test_result("TextNormalizer.normalize()", passed, f"Got: '{result}'")
         all_passed = all_passed and passed
     except Exception as e:
-        test_result("TextNormalizer.normalize()", False, str(e))
+        print_test_result("TextNormalizer.normalize()", False, str(e))
         all_passed = False
     
     # Test TextNormalizer list normalization
@@ -176,10 +176,10 @@ def test_shared_functionality():
         normalizer = TextNormalizer()
         result = normalizer.normalize_list(["  text1  ", "  text2  ", "  text1  "])
         passed = result == ["text1", "text2"] and len(result) == 2
-        test_result("TextNormalizer.normalize_list()", passed, f"Got: {result}")
+        print_test_result("TextNormalizer.normalize_list()", passed, f"Got: {result}")
         all_passed = all_passed and passed
     except Exception as e:
-        test_result("TextNormalizer.normalize_list()", False, str(e))
+        print_test_result("TextNormalizer.normalize_list()", False, str(e))
         all_passed = False
     
     # Test logger setup
@@ -187,9 +187,9 @@ def test_shared_functionality():
         from shared.logger import setup_logger
         logger = setup_logger("test")
         logger.info("Test message")
-        test_result("setup_logger()", True)
+        print_test_result("setup_logger()", True)
     except Exception as e:
-        test_result("setup_logger()", False, str(e))
+        print_test_result("setup_logger()", False, str(e))
         all_passed = False
     
     # Test AppleMusicInterface instantiation
@@ -198,9 +198,9 @@ def test_shared_functionality():
         from shared.apple_music import AppleMusicInterface
         shared_scripts = os.path.join(os.path.dirname(__file__), '..', 'shared', 'scripts')
         ami = AppleMusicInterface(scripts_dir=shared_scripts)
-        test_result("AppleMusicInterface instantiation", True)
+        print_test_result("AppleMusicInterface instantiation", True)
     except Exception as e:
-        test_result("AppleMusicInterface instantiation", False, str(e))
+        print_test_result("AppleMusicInterface instantiation", False, str(e))
         all_passed = False
     
     return all_passed
@@ -212,26 +212,20 @@ def test_backwards_compatibility():
     
     all_passed = True
     
-    # Test plsort.src.apple_music
+    # Test src.apple_music import (now in src/)
     try:
-        # Change to plsort directory for relative import
-        old_cwd = os.getcwd()
-        os.chdir(str(PROJECT_ROOT / 'plsort'))
-        sys.path.insert(0, str(PROJECT_ROOT))
-        
-        from src.apple_music import AppleMusicInterface
-        test_result("plsort.src.apple_music import", True)
-        os.chdir(old_cwd)
+        from apple_music import AppleMusicInterface
+        print_test_result("src.apple_music import", True)
     except ImportError as e:
-        test_result("plsort.src.apple_music import", False, str(e))
+        print_test_result("src.apple_music import", False, str(e))
         all_passed = False
     
-    # Test plsort.src.normalizer
+    # Test src.normalizer import (now in src/)
     try:
-        from plsort.src.normalizer import TextNormalizer
-        test_result("plsort.src.normalizer import", True)
+        from normalizer import TextNormalizer
+        print_test_result("src.normalizer import", True)
     except ImportError as e:
-        test_result("plsort.src.normalizer import", False, str(e))
+        print_test_result("src.normalizer import", False, str(e))
         all_passed = False
     
     return all_passed
@@ -245,19 +239,24 @@ def test_syntax():
     
     files_to_check = [
         'main.py',
-        'shared/__init__.py',
-        'shared/apple_music.py',
-        'shared/normalizer.py',
-        'shared/logger.py',
+        'src/__init__.py',
+        'src/apple_music.py',
+        'src/normalizer.py',
+        'src/logger.py',
     ]
     
     all_passed = True
     for file_path in files_to_check:
         try:
-            py_compile.compile(str(PROJECT_ROOT / file_path), doraise=True)
-            test_result(f"Syntax check: {file_path}", True)
+            full_path = PROJECT_ROOT / file_path
+            if full_path.exists():
+                py_compile.compile(str(full_path), doraise=True)
+                print_test_result(f"Syntax check: {file_path}", True)
+            else:
+                print_test_result(f"Syntax check: {file_path}", False, "File not found")
+                all_passed = False
         except py_compile.PyCompileError as e:
-            test_result(f"Syntax check: {file_path}", False, str(e))
+            print_test_result(f"Syntax check: {file_path}", False, str(e))
             all_passed = False
     
     return all_passed
@@ -279,10 +278,10 @@ def test_main_cli():
             timeout=5
         )
         passed = result.returncode == 0
-        test_result("main.py --help", passed, f"Return code: {result.returncode}")
+        print_test_result("main.py --help", passed, f"Return code: {result.returncode}")
         all_passed = all_passed and passed
     except Exception as e:
-        test_result("main.py --help", False, str(e))
+        print_test_result("main.py --help", False, str(e))
         all_passed = False
     
     # Test --list
@@ -295,10 +294,10 @@ def test_main_cli():
             timeout=5
         )
         passed = result.returncode == 0 and '4tempers' in result.stdout
-        test_result("main.py --list", passed, f"Return code: {result.returncode}")
+        print_test_result("main.py --list", passed, f"Return code: {result.returncode}")
         all_passed = all_passed and passed
     except Exception as e:
-        test_result("main.py --list", False, str(e))
+        print_test_result("main.py --list", False, str(e))
         all_passed = False
     
     return all_passed

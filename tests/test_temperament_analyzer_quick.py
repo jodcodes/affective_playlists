@@ -7,6 +7,11 @@ before connecting to real Apple Music library.
 """
 
 import sys
+import os
+
+# Add src to path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+
 from temperament_analyzer import (
     Track, Playlist, Temperament, ClassificationResult,
     TemperamentAnalyzer, MusicLibraryClient, LLMClient
