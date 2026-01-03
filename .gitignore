@@ -71,9 +71,3 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
-
-# Old documentation (consolidated)
-Docs/
-ARCHITECTURE.md
-PROJECT_SUMMARY.md
-SETUP_GUIDE.md

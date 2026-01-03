@@ -194,32 +194,32 @@ pip list | grep python-dotenv
 
 ## Next Steps
 
-1. **Read the full architecture guide:**
+1. **Read the full documentation:**
    ```bash
-   cat REFACTORING_GUIDE.md
+   cat docs/OVERVIEW.md
    ```
 
-2. **Explore individual subrepo docs:**
+2. **Explore the specifications:**
    ```bash
-   cat 4tempers/README.md
-   cat metad_enr/README.md
-   cat plsort/README.md
+   cat docs/requirements/SPEC_TEMPERAMENT_ANALYZER.md
+   cat docs/requirements/SPEC_METADATA_ENRICHMENT.md
+   cat docs/requirements/SPEC_PLAYLIST_ORGANIZATION.md
    ```
 
 3. **View available commands:**
    ```bash
    python main.py --help
-   python main.py 4tempers --help
-   python main.py metad_enr --help
-   python main.py plsort --help
+   python main.py temperament --help
+   python main.py enrich --help
+   python main.py organize --help
    ```
 
 ## Support
 
 For issues or questions:
-1. Check the REFACTORING_GUIDE.md
-2. Review individual subrepo documentation
-3. Check logs in `logs/` directory
+1. Check the documentation in `docs/`
+2. Review log files in `data/logs/` or `temperament_analyzer.log`
+3. Verify `.env` configuration
 4. Run with `--verbose` for detailed output
 
 ## Architecture Highlights
