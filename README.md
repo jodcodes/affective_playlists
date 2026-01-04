@@ -7,7 +7,7 @@ A single, cohesive project that combines three powerful music tools into one str
 ## Features
 
 - 🎵 **Temperament Analysis** - AI-based playlist emotion classification (4 categories: Woe, Frolic, Dread, Malice)
-- 📝 **Metadata Enrichment** - Automatic metadata filling (BPM, Genre, Year) from multiple databases
+- 📝 **Metadata Enrichment** - Automatic metadata filling (BPM, Genre, Year, CoverArt) from multiple databases
 - 📁 **Playlist Organization** - Genre-based playlist classification and organization
 
 ## Quick Start
@@ -101,8 +101,16 @@ Control which playlists are processed in `data/config/whitelist.json`:
 ## Documentation
 
 - **Temperament Analysis**: Classic emotion-based playlist classification using GPT
-- **Metadata Enrichment**: Fills missing audio metadata from MusicBrainz, Spotify, and other sources
+- **Metadata Enrichment**: Fills missing audio metadata (BPM, Genre, Year, Cover Art) with a hierarchical source strategy and per-field enrichment optimization
 - **Playlist Organization**: Classifies and organizes playlists by genre (Hip-Hop, Electronic, Jazz, etc.)
+
+### Metadata Enrichment Strategy
+
+The metadata enrichment module uses a **per-field enrichment** approach:
+- **Hierarchy**: Queries sources in order: Discogs → Last.fm → Wikidata → MusicBrainz → AcousticBrainz
+- **Enrich Once Per Field**: Stops querying sources for a field once any source provides a value, then moves to the next missing field
+- **No Songs Skipped**: Processes all files regardless of metadata completeness; only skips redundant queries
+- **~50% Fewer API Calls**: Optimization reduces unnecessary lookups for fields already enriched
 
 All scripts and AppleScript files are in `src/scripts/`.
 All configurations and data files are centralized in `data/`.

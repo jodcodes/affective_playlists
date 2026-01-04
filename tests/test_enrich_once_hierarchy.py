@@ -1,13 +1,17 @@
 """
-Tests for the "enrich once" metadata query strategy and new query hierarchy.
+Tests for the "exact missing fields" metadata query strategy and new query hierarchy.
 
 This test file validates:
 1. New query priority order: Discogs → Last.fm → Wikidata → MusicBrainz → AcousticBrainz
-2. Per-field "Enrich once" behavior: each field enriched once from first source that has it
-3. No songs skipped: continues querying until all fields found or all sources exhausted
-4. Example: Discogs has Genre+Year, Last.fm has Genre+Tags → uses Genre from Discogs,
-   continues to find other fields like BPM from other sources
-5. Performance improvement while ensuring complete enrichment
+2. Exact missing fields behavior: only search for fields that are actually missing
+3. No songs skipped: continues querying until all missing fields found or sources exhausted
+4. Skip present fields: don't re-enrich metadata that already exists
+5. Example: Track missing BPM, Year. Has Genre:
+   - Discogs returns Genre, Year → skip Genre (have), collect Year
+   - Last.fm returns Genre, Tags → skip all (Genre present, Tags not a field)
+   - MusicBrainz returns BPM, Year → skip Year (found), collect BPM
+   - Result: Year + BPM enriched, Genre unchanged
+6. Performance improvement by only searching for missing fields
 """
 
 import unittest
@@ -229,54 +233,85 @@ class TestOrchestratorInitialization(unittest.TestCase):
         self.assertEqual(orchestrator.discogs_token, "test_token")
 
 
-class TestPerFieldEnrichment(unittest.TestCase):
-    """Test per-field enrichment strategy (no songs skipped)."""
+class TestMissingFieldsStrategy(unittest.TestCase):
+    """Test exact missing fields enrichment strategy."""
     
-    def test_enrich_once_is_per_field_not_per_track(self):
-        """Test that enrich_once works per-field, not per-track.
-        
-        Example:
-        - Discogs returns Genre + Year
-        - Last.fm returns Genre + Tags
-        - Result should include: Genre (from Discogs), Year (from Discogs)
-        - Should continue to other sources for more fields like BPM
-        """
+    def test_missing_fields_parameter_exists(self):
+        """Test that missing_fields parameter is available."""
         orchestrator = MetadataQueryOrchestrator()
         
-        # The method should accept enrich_once parameter
         import inspect
         sig = inspect.signature(orchestrator.query_all_sources)
-        self.assertIn('enrich_once', sig.parameters)
+        self.assertIn('missing_fields', sig.parameters)
     
-    def test_no_songs_skipped_doctrine(self):
-        """Test that the implementation follows 'no songs skipped' principle.
+    def test_missing_fields_default_none(self):
+        """Test that missing_fields defaults to None (search all)."""
+        orchestrator = MetadataQueryOrchestrator()
         
-        This means:
-        - If a song is missing metadata, try to enrich it
-        - Continue querying sources until all fields found or all sources exhausted
-        - Don't stop after first source just because it returned something
+        import inspect
+        sig = inspect.signature(orchestrator.query_all_sources)
+        default = sig.parameters['missing_fields'].default
+        
+        self.assertIsNone(default)
+    
+    def test_only_searches_for_missing_fields(self):
+        """Test that only missing fields are searched for.
+        
+        If a field is not in missing_fields list, it should be skipped
+        even if sources return it.
         """
         orchestrator = MetadataQueryOrchestrator()
         
-        # Check that query_all_sources continues through all sources
+        import inspect
+        source_code = inspect.getsource(orchestrator.query_all_sources)
+        
+        # Should check if field is in missing_fields
+        self.assertIn('if field in missing_fields', source_code)
+        # Should skip fields not in missing_fields (either by checking missing_fields or found_fields)
+        self.assertTrue(
+            'not in missing_fields' in source_code or 'field not in found_fields' in source_code,
+            "Implementation should skip fields not in missing_fields or already found"
+        )
+    
+    def test_skips_fields_already_found(self):
+        """Test that fields already found from other sources are skipped."""
+        orchestrator = MetadataQueryOrchestrator()
+        
+        import inspect
+        source_code = inspect.getsource(orchestrator.query_all_sources)
+        
+        # Should track found_fields
+        self.assertIn('found_fields', source_code)
+        # Should check if field already found
+        self.assertIn('field not in found_fields', source_code)
+
+
+class TestNoSongsSkipped(unittest.TestCase):
+    """Test 'no songs skipped' principle with exact missing fields."""
+    
+    def test_continues_until_all_missing_found(self):
+        """Test that system continues querying until all missing fields found."""
+        orchestrator = MetadataQueryOrchestrator()
+        
         import inspect
         source_code = inspect.getsource(orchestrator.query_all_sources)
         
         # Should iterate through all sources in QUERY_ORDER
         self.assertIn('for source, query_class in self.QUERY_ORDER', source_code)
-        # Should not have early break on finding first metadata
-        self.assertNotIn('if found_fields:\n                break', source_code)
+        # Should check if all missing fields found
+        self.assertIn('all(field in found_fields for field in missing_fields)', source_code)
     
     def test_field_tracking_not_song_tracking(self):
-        """Test that we track found fields, not just whether we found anything."""
+        """Test that we track found fields for missing_fields list."""
         orchestrator = MetadataQueryOrchestrator()
         
-        # Should track found_fields (per field) not found_tracks (per song)
         import inspect
         source_code = inspect.getsource(orchestrator.query_all_sources)
         
+        # Should track found_fields (per field)
         self.assertIn('found_fields', source_code)
-        self.assertIn('field not in found_fields', source_code)
+        # Should check field in missing_fields
+        self.assertIn('field in missing_fields', source_code)
 
 
 if __name__ == '__main__':

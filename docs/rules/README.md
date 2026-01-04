@@ -97,6 +97,16 @@ Follow **TEST_ORGANIZATION_RULE.md** when creating or running tests.
 ### For File Organization
 Follow **MARKDOWN_FILE_ORGANIZATION.md** for where to place all documentation.
 
+### 5. CODE_QUALITY_STANDARDS.md - Python Development Standards
+
+Covers:
+- Type hints and static typing expectations
+- Docstring standards (Google/NumPy format)
+- Error handling patterns
+- Logging best practices
+- Code organization and imports
+- Performance and optimization guidelines
+
 ## Quick Checklist
 
 Before starting work:
@@ -109,8 +119,12 @@ Before committing code:
 - [ ] Ensure all tests pass
 - [ ] Follow documentation standards for any spec changes
 - [ ] Update `requirements.txt` if dependencies changed
-- [ ] Run code through formatter/linter if available
+- [ ] Add/update type hints in modified functions
+- [ ] Add comprehensive docstrings to new functions
+- [ ] Run pylint or formatter if available
+- [ ] Verify no unused imports
+- [ ] Check logging uses `logger` not `print()`
 
 ---
 
-**Last Updated**: January 3, 2026
+**Last Updated**: January 4, 2026

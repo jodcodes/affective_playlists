@@ -75,15 +75,46 @@ When requirements change:
 4. Update related files (e.g., if SPEC changes, update TECH_REQ)
 5. Commit with clear message: "Req: Updated SPEC_X feature requirements"
 
+## Non-Functional Requirements
+
+All implementations must meet these non-functional requirements:
+
+1. **Code Quality**
+   - All code must follow Python standards in `docs/rules/CODE_QUALITY_STANDARDS.md`
+   - Type hints required on all function signatures
+   - Comprehensive docstrings required (Google style)
+   - No bare exception handling
+
+2. **Logging**
+   - Use centralized logger from `src/logger.py`
+   - No `print()` statements in operational code
+   - Appropriate log levels (DEBUG, INFO, WARNING, ERROR)
+
+3. **Testing**
+   - Unit tests required for all public functions
+   - Minimum 70% code coverage target
+   - Integration tests for critical workflows
+
+4. **Performance**
+   - API requests must timeout within 30 seconds
+   - Playlist operations must complete within 5 minutes
+   - No loading entire playlists into memory without streaming large data
+
+5. **Error Handling**
+   - Specific exception types, never bare `except:`
+   - Meaningful error messages with context
+   - Graceful degradation where possible
+
 ## Cross-References
 
 - Implementation details: See `src/` folder
 - Test coverage: See `tests/` folder
 - Reports and summaries: See `docs/summary/` folder
 - Architecture overview: See `docs/OVERVIEW.md`
+- Code quality standards: See `docs/rules/CODE_QUALITY_STANDARDS.md`
 - Development roadmap: See `NEXT_STEPS.md`
 
 ---
 
-**Last Updated**: January 3, 2026  
+**Last Updated**: January 4, 2026  
 **Status**: All specifications complete and tested

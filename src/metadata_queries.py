@@ -5,24 +5,25 @@ LAYER: Data Layer - Query Orchestration
 ROLE: Unified interface for querying multiple music databases
 ARCHITECTURE: See src/README.md for full architecture
 
-Queries external music databases in priority order with per-field "enrich once" strategy:
+Queries external music databases in priority order with "exact missing fields" strategy:
 1. Discogs - Genre, release year, catalog info (vinyl database) - FIRST
 2. Last.fm - Genre tags, popularity, user classifications (user-generated)
 3. Wikidata - Genre, year, artist/track relationships (structured data)
 4. MusicBrainz - Track metadata, BPM, year, MBID lookup
 5. AcousticBrainz - Audio analysis (BPM, key, tempo from MusicBrainz ID) - LAST
 
-For each FIELD (BPM, Genre, Year, etc.):
+For each MISSING FIELD (fields not already present in track):
 - Uses first source that has the field
 - Skips that field in subsequent sources (already have highest-priority version)
-- Continues through all sources to find different fields
-- NO SONGS SKIPPED - enriches all available metadata
+- Skips fields already present (don't re-enrich existing metadata)
+- Continues through all sources to find remaining missing fields
+- NO SONGS SKIPPED - searches all sources for missing metadata
 
-Example:
-- Discogs returns: Genre, Year → collect both
-- Last.fm returns: Genre, Tags → skip Genre (have from Discogs), skip Tags (not a field)
-- Wikidata returns: BPM → collect BPM (don't have it yet)
-- Result: Genre (Discogs), Year (Discogs), BPM (Wikidata)
+Example (Track missing: BPM, Year. Already has: Genre):
+- Discogs returns: Genre, Year → skip Genre (have it), collect Year
+- Last.fm returns: Genre, Tags → skip all (Genre present, Tags not a field)
+- MusicBrainz returns: BPM, Year → skip Year (found), collect BPM
+- Result: Year (Discogs), BPM (MusicBrainz), Genre (unchanged)
 
 All queries are read-only. No rate-limited API keys are required.
 Implements caching to minimize requests.
@@ -542,28 +543,33 @@ class MetadataQueryOrchestrator:
 
     def query_all_sources(self, artist: str, title: str,
                           duration: Optional[int] = None,
-                          enrich_once: bool = True) -> List[MetadataEntry]:
+                          enrich_once: bool = True,
+                          missing_fields: Optional[List[MetadataField]] = None) -> List[MetadataEntry]:
         """
-        Query available sources for metadata.
+        Query available sources for specific metadata fields.
         
         Queries are performed in deterministic priority order.
-        If enrich_once=True, enriches one field at a time (stops when all fields found).
+        If enrich_once=True, searches only for missing fields from highest-priority sources.
         If enrich_once=False, queries all sources for comparison.
         
-        With enrich_once=True:
-        - Discogs finds Genre, Year → collect those
-        - Last.fm doesn't have Genre/Year → continues
-        - Check if all fields found → if not, try next source
-        - Continue until all fields found or all sources exhausted
+        With enrich_once=True and missing_fields specified:
+        - Only search for specified missing fields
+        - Discogs returns Genre + Year (from missing_fields) → collect
+        - Skip fields already found from other sources
+        - Continue to next source looking for remaining missing fields
+        - Stops when all missing fields found OR all sources exhausted
         
-        This ensures NO SONG IS SKIPPED - it enriches all available metadata
-        from the highest-priority sources that have it.
+        This ensures:
+        - NO SONGS ARE SKIPPED (searches all sources for missing fields)
+        - EFFICIENT QUERIES (only queries for fields that are actually missing)
+        - ACCURATE ENRICHMENT (uses highest-priority sources for each field)
         
         Args:
             artist: Artist name
             title: Track title
             duration: Duration in seconds
-            enrich_once: Enrich each field once (from first source that has it) (default: True)
+            enrich_once: Search for missing fields from priority sources (default: True)
+            missing_fields: List of fields that need enrichment (default: None - search all)
             
         Returns:
             List of MetadataEntry objects with sources
@@ -574,15 +580,19 @@ class MetadataQueryOrchestrator:
             return self.query_cache[cache_key]
 
         entries = []
-        found_fields: Dict[MetadataField, bool] = {}  # Track which fields already have values
+        found_fields: Dict[MetadataField, bool] = {}  # Track which fields have been found
+        
+        # If missing_fields not specified, assume we're looking for all field types
+        if missing_fields is None:
+            missing_fields = list(MetadataField)
 
         for source, query_class in self.QUERY_ORDER:
-            # With enrich_once: stop if all expected fields are found
-            if enrich_once and found_fields:
-                # Check if we're still looking for any fields
-                # For now, if we found at least one field, we keep trying for others
-                # This ensures complete enrichment without skipping tracks
-                pass
+            # With enrich_once: check if all missing fields have been found
+            if enrich_once and missing_fields:
+                all_found = all(field in found_fields for field in missing_fields)
+                if all_found:
+                    self.logger.debug(f"All missing fields found. Skipping remaining sources.")
+                    break
 
             if source == DatabaseSource.LASTFM:
                 # LastFM requires API key
@@ -596,13 +606,16 @@ class MetadataQueryOrchestrator:
                 querier = query_class(logger=self.logger)
 
             self.logger.debug(f"Querying {source.name} for {artist} - {title}")
+            self.logger.debug(f"  Looking for missing fields: {[f.name for f in missing_fields if f not in found_fields]}")
 
             results = querier.query(artist, title, duration)
 
             if results:
                 for field, (value, confidence) in results.items():
-                    # Only accept if we don't already have this field
-                    if field not in found_fields:
+                    # Only collect if:
+                    # 1. This field is in our missing_fields list
+                    # 2. We haven't already found this field
+                    if field in missing_fields and field not in found_fields:
                         entry = MetadataEntry(
                             field=field,
                             value=value,
@@ -611,9 +624,11 @@ class MetadataQueryOrchestrator:
                         )
                         entries.append(entry)
                         found_fields[field] = True
-                        self.logger.debug(f"  Found {field.name} from {source.name}: {value} (conf: {confidence})")
+                        self.logger.debug(f"  ✓ Found {field.name} from {source.name}: {value} (conf: {confidence})")
+                    elif field in found_fields:
+                        self.logger.debug(f"  ✗ Skipping {field.name} from {source.name} (already have from {self._get_field_source(entries, field).name})")
                     else:
-                        self.logger.debug(f"  Skipping {field.name} from {source.name} (already have from {self._get_field_source(entries, field).name})")
+                        self.logger.debug(f"  ✗ Skipping {field.name} from {source.name} (not in missing fields)")
 
             # Add rate limiting between queries
             time.sleep(0.5)

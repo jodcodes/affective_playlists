@@ -47,6 +47,10 @@ from metadata_enrichment import (
 )
 from cover_art import CoverArtManager
 from metadata_queries import MetadataQueryOrchestrator
+from cli_ui import (
+    print_header, print_footer, success, error, warning, info,
+    Menu, ProgressBar, Table, format_stats, Box
+)
 
 
 @dataclass
@@ -119,8 +123,52 @@ class MetadataFiller:
             self.logger.warning(f"Could not load playlist folders config: {e}")
             return {}
     
+    def _find_playlist_fuzzy(self, playlist_name: str, playlist_ids: dict) -> Optional[str]:
+        """
+        Fuzzy match playlist name (case-insensitive, handles partial matches).
+        
+        Args:
+            playlist_name: Name to search for
+            playlist_ids: Dictionary of available playlists
+            
+        Returns:
+            Playlist ID if found, None otherwise
+        """
+        import difflib
+        
+        if not playlist_ids:
+            return None
+        
+        # Exact case-insensitive match
+        for name in playlist_ids.keys():
+            if name.lower() == playlist_name.lower():
+                self.logger.debug(f"Fuzzy match (case-insensitive): {playlist_name} -> {name}")
+                return playlist_ids[name]
+        
+        # Fuzzy string matching using difflib (>80% similarity)
+        playlist_list = list(playlist_ids.keys())
+        matches = difflib.get_close_matches(
+            playlist_name.lower(),
+            [n.lower() for n in playlist_list],
+            n=1,
+            cutoff=0.8
+        )
+        
+        if matches:
+            # Find original name with correct casing
+            idx = [n.lower() for n in playlist_list].index(matches[0])
+            original_name = playlist_list[idx]
+            self.logger.debug(f"Fuzzy match (similarity): {playlist_name} -> {original_name}")
+            return playlist_ids[original_name]
+        
+        return None
+    
     def _get_playlist_ids(self) -> dict:
-        """Get all user playlists with their persistent IDs"""
+        """Get all user playlists with their persistent IDs
+        
+        Returns:
+            Dictionary mapping playlist names to their hex IDs
+        """
         if self._playlist_ids_cache is not None:
             return self._playlist_ids_cache
         
@@ -134,25 +182,49 @@ class MetadataFiller:
                 self.logger.error("Failed to get playlist IDs")
                 return {}
             
-            # Parse output: name:VALUE, id:HEXID
-            # The output is all on one line, IDs are always 16 hex digits
-            # So we can match name: followed by anything until , id:HEXID
             import re
             playlists = {}
             
-            # Pattern: name:ANYTHING, id:16HEXDIGITS
-            # Use non-greedy matching with [^}] to stop at the next id:
-            pattern = r'name:([^}]+?),\s*id:([A-F0-9]{16})'
-            matches = re.findall(pattern, result.stdout)
+            # Find all hex IDs (16 hex digits) and look backward for "name:" label
+            # IDs are always exactly 16 hex digits
+            id_pattern = r'([A-F0-9]{16})'
+            id_matches = list(re.finditer(id_pattern, result.stdout, re.IGNORECASE))
             
-            for name, pid in matches:
-                name = name.strip()
-                # Remove quotes if present
-                if name.startswith("'") and name.endswith("'"):
-                    name = name[1:-1]
-                elif name.startswith("\"") and name.endswith("\""):
-                    name = name[1:-1]
-                playlists[name] = pid
+            if not id_matches:
+                self.logger.warning("No playlist IDs found in output")
+                return {}
+            
+            # For each ID found, work backward to find the corresponding name
+            output = result.stdout
+            
+            for id_match in id_matches:
+                hex_id = id_match.group(1)
+                # Look backward from the ID match
+                pos = id_match.start()
+                before_id = output[:pos]
+                
+                # Find the last "name:" before this ID
+                # Match: name:VALUE where VALUE can have spaces, hyphens, numbers, letters
+                name_pattern = r'name:([^,]*?)(?:,\s*id:|$)'
+                name_matches = list(re.finditer(name_pattern, before_id))
+                
+                if name_matches:
+                    # Get the last (most recent) name match
+                    last_name_match = name_matches[-1]
+                    name = last_name_match.group(1).strip()
+                    
+                    # Remove quotes if present
+                    if name.startswith("'") and name.endswith("'"):
+                        name = name[1:-1]
+                    elif name.startswith("\"") and name.endswith("\""):
+                        name = name[1:-1]
+                    
+                    if name:  # Only add if we got a valid name
+                        playlists[name] = hex_id
+                        self.logger.debug(f"Found playlist: {name} -> {hex_id}")
+            
+            if not playlists:
+                self.logger.warning("No valid playlist name/ID pairs found")
             
             self._playlist_ids_cache = playlists
             return playlists
@@ -175,10 +247,20 @@ class MetadataFiller:
         # Get playlist ID
         print(f"\nLoading playlist: {playlist_name}...")
         playlist_ids = self._get_playlist_ids()
+        
+        # Try exact match first
         playlist_id = playlist_ids.get(playlist_name)
         
+        # If not found, try fuzzy matching (case-insensitive, normalized)
         if not playlist_id:
-            self.logger.warning(f"Playlist '{playlist_name}' not found")
+            playlist_id = self._find_playlist_fuzzy(playlist_name, playlist_ids)
+        
+        if not playlist_id:
+            # List available playlists for user
+            available = ', '.join(list(playlist_ids.keys())[:5])
+            if len(playlist_ids) > 5:
+                available += f', ... ({len(playlist_ids) - 5} more)'
+            self.logger.warning(f"Playlist '{playlist_name}' not found. Available: {available}")
             return {'success': False, 'error': f'Playlist {playlist_name} not found'}
         
         # Get playlist tracks using ID
@@ -584,6 +666,9 @@ class MetadataFillCLI:
         Returns:
             Exit code (0 = success, 1 = failure)
         """
+        # Print fancy header
+        print_header("🎵 Metadata Enrichment", "Making your library complete")
+        
         # Set logging level based on verbosity
         if hasattr(args, 'verbose') and args.verbose:
             self.logger.setLevel(logging.DEBUG)
@@ -593,21 +678,16 @@ class MetadataFillCLI:
         
         # Log start of operation
         target = args.playlist if args.playlist else args.folder
-        self.logger.info(f"\n{'='*80}")
-        self.logger.info(f"METADATA ENRICHMENT STARTED")
-        self.logger.info(f"{'='*80}")
         self.logger.info(f"Target: {target}")
         self.logger.info(f"Force overwrite: {getattr(args, 'force', False)}")
-        self.logger.info(f"Verbose: {getattr(args, 'verbose', False)}")
-        self.logger.info(f"{'='*80}\n")
         
         # Validate exactly one target is specified
         if args.playlist and args.folder:
-            self.logger.error("Specify either --playlist or --folder, not both")
+            print(error("Specify either --playlist or --folder, not both"))
             return 1
 
         if not args.playlist and not args.folder:
-            self.logger.error("Must specify either --playlist or --folder")
+            print(error("Must specify either --playlist or --folder"))
             return 1
 
         # Process target
@@ -624,7 +704,7 @@ class MetadataFillCLI:
                 )
 
             if not result.get('success'):
-                self.logger.error(f"Operation failed: {result.get('error')}")
+                print(error(f"Operation failed: {result.get('error')}"))
                 return 1
 
             # Print summary
@@ -632,20 +712,20 @@ class MetadataFillCLI:
             return 0
 
         except Exception as e:
-            self.logger.error(f"Unexpected error: {e}")
+            print(error(f"Unexpected error: {e}"))
             import traceback
             traceback.print_exc()
             return 1
 
     def _print_summary(self, result: Dict) -> None:
         """Print operation summary."""
-        print("\n" + "="*80)
-        print("Metadata Fill Summary")
-        print("="*80)
-        print(f"Processed: {result.get('processed', 0)} items")
-        print(f"Enriched:  {result.get('enriched', 0)} items")
-        print(f"Skipped:   {result.get('skipped', 0)} items")
-        print("="*80 + "\n")
+        stats = {
+            'Enriched': result.get('enriched', 0),
+            'Skipped': result.get('skipped', 0),
+            'Errors': result.get('errors', 0),
+        }
+        print(format_stats("Enrichment Summary", stats))
+        print_footer()
 
 
 def create_cli_parser() -> argparse.ArgumentParser:

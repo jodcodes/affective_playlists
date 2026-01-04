@@ -28,6 +28,10 @@ from logger import setup_logger
 from apple_music import AppleMusicInterface
 from normalizer import TextNormalizer
 from config import load_centralized_whitelist
+from cli_ui import (
+    print_header, print_footer, success, error, warning, info,
+    Menu, Box, Icon, Color, bold
+)
 
 logger = setup_logger("affective_playlists")
 
@@ -58,35 +62,39 @@ except ImportError as e:
 
 def run_temperament_analysis(args=None):
     """Run 4tempers - AI temperament analysis."""
-    print("\n" + "="*70)
-    print("TEMPERAMENT ANALYSIS - AI-based Playlist Emotion Classification")
-    print("="*70 + "\n")
+    print_header("🎭 Temperament Analysis", "AI-based Playlist Emotion Classification")
     
     try:
+        print(info("Initializing clients..."))
+        
         # Initialize clients
         music_client = MusicAppClient()
         llm_client = OpenAILLMClient()
         
         # Authenticate
+        print(info("Connecting to Music.app..."))
         if not music_client.authenticate():
-            print("ERROR: Could not connect to Music.app")
+            print(error("Could not connect to Music.app"))
             return 1
         
+        print(success("Connected to Music.app"))
+        
         # Run analysis
+        print(info("Starting temperament analysis..."))
         analyzer = TemperamentAnalyzer(music_client, llm_client)
         analyzer.run()
+        
+        print_footer()
         return 0
     except Exception as e:
         logger.error(f"Temperament analysis failed: {e}")
-        print(f"ERROR: {e}")
+        print(error(f"Analysis failed: {e}"))
         return 1
 
 
 def run_metadata_enrichment(args=None):
     """Run metad_enr - metadata enrichment."""
-    print("\n" + "="*70)
-    print("METADATA ENRICHMENT - Fill Missing Audio Metadata")
-    print("="*70 + "\n")
+    # Header is printed by MetadataFillCLI, but we show info here
     
     try:
         from metadata_fill import MetadataFillCLI
@@ -96,10 +104,8 @@ def run_metadata_enrichment(args=None):
         whitelist_enabled, whitelist = load_centralized_whitelist()
         
         # Create interactive menu
-        print("What would you like to enrich metadata for?")
-        print("1. Playlist")
-        print("2. Folder")
-        choice = input("Enter your choice (1 or 2): ").strip()
+        target_options = ["Playlist", "Folder"]
+        target_choice = Menu.select("📁 What would you like to enrich?", target_options)
         
         cli = MetadataFillCLI()
         
@@ -108,56 +114,41 @@ def run_metadata_enrichment(args=None):
         args_ns.force = False
         args_ns.verbose = os.getenv('VERBOSE', 'false').lower() == 'true'
         
-        if choice == "1":
+        if target_choice == 0:  # Playlist
             # Check if whitelist is enabled
             if whitelist_enabled and whitelist:
-                print(f"\nWhitelist enabled with {len(whitelist)} playlists.")
-                print("\nChoose a playlist:")
-                print("0. Enter playlist name manually")
+                print(info(f"Whitelist enabled with {len(whitelist)} playlists"))
                 
                 whitelist_list = sorted(list(whitelist))
-                for i, pl_name in enumerate(whitelist_list, 1):
-                    print(f"{i}. {pl_name}")
+                playlist_options = ["Enter playlist name manually"] + whitelist_list
+                pl_choice = Menu.select("🎵 Choose a playlist", playlist_options)
                 
-                pl_choice = input("\nEnter playlist number or 0 for manual entry: ").strip()
-                
-                try:
-                    pl_idx = int(pl_choice)
-                    if pl_idx == 0:
-                        playlist_name = input("Enter playlist name: ").strip()
-                    elif 1 <= pl_idx <= len(whitelist_list):
-                        playlist_name = whitelist_list[pl_idx - 1]
-                    else:
-                        print("ERROR: Invalid playlist number")
-                        return 1
-                except ValueError:
-                    print("ERROR: Invalid input")
-                    return 1
+                if pl_choice == 0:
+                    playlist_name = Menu.input_text("Playlist name")
+                else:
+                    playlist_name = whitelist_list[pl_choice - 1]
             else:
-                playlist_name = input("Enter playlist name: ").strip()
+                playlist_name = Menu.input_text("🎵 Playlist name")
             
             if not playlist_name:
-                print("ERROR: Playlist name required")
+                print(error("Playlist name required"))
                 return 1
             args_ns.playlist = playlist_name
             args_ns.folder = None
-        elif choice == "2":
-            folder_path = input("Enter folder path or name: ").strip()
+        else:  # Folder
+            folder_path = Menu.input_text("📁 Folder path or name")
             if not folder_path:
-                print("ERROR: Folder path required")
+                print(error("Folder path required"))
                 return 1
             args_ns.playlist = None
             args_ns.folder = folder_path
-        else:
-            print("ERROR: Invalid choice")
-            return 1
         
         exit_code = cli.run(args_ns)
         return exit_code
         
     except Exception as e:
         logger.error(f"Metadata enrichment failed: {e}")
-        print(f"ERROR: {e}")
+        print(error(f"Enrichment failed: {e}"))
         import traceback
         traceback.print_exc()
         return 1
@@ -165,78 +156,68 @@ def run_metadata_enrichment(args=None):
 
 def run_playlist_organization(args=None):
     """Run plsort - playlist organization by genre."""
-    print("\n" + "="*70)
-    print("PLAYLIST ORGANIZATION - Classify & Organize by Genre")
-    print("="*70 + "\n")
+    print_header("📚 Playlist Organization", "Classify & Organize by Genre")
     
     try:
         if plsort_module is None:
-            print("ERROR: plsort module not available")
+            print(error("plsort module not available"))
             return 1
         
         # Check if whitelist is enabled
         whitelist_enabled, whitelist = load_centralized_whitelist()
         
         if whitelist_enabled:
-            print(f"Whitelist is ENABLED with {len(whitelist)} playlists")
-            print("The system will only process whitelisted playlists.")
+            print(warning(f"Whitelist ENABLED with {len(whitelist)} playlists"))
         else:
-            print("Whitelist is DISABLED - all playlists will be processed")
+            print(info("Whitelist disabled - all playlists will be processed"))
         
-        print("\nIMPORTANT: This will ACTUALLY MOVE playlists in Apple Music!")
-        print("For safety, add --dry-run to test without making changes.\n")
-        print("For more control, use plsort directly:")
-        print("  python src/plsort.py --select-from-whitelist  # Choose specific whitelisted playlists")
-        print("  python src/plsort.py --dry-run              # All whitelisted playlists (dry-run)")
-        print("  python src/plsort.py                        # Interactive mode")
-        print("  python src/plsort.py --ignore-whitelist     # Process all playlists")
+        print()
+        print(warning("⚠️  This will ACTUALLY MOVE playlists in Apple Music!"))
+        print()
+        
+        # Show dry-run warning
+        if not Menu.confirm("Continue with playlist organization?", default=False):
+            print(info("Organization cancelled"))
+            return 0
+        
+        print(info("Starting playlist organization..."))
         
         # Run plsort with default settings (will actually move playlists)
         result = plsort_module.main(args=['--no-interactive'])
+        
+        print_footer()
         return result if result is not None else 0
     except Exception as e:
         logger.error(f"Playlist organization failed: {e}")
-        print(f"ERROR: {e}")
+        print(error(f"Organization failed: {e}"))
         return 1
 
 
 def show_interactive_menu():
     """Show interactive menu to select and run a feature."""
-    print("\n" + "="*70)
-    print("affective_playlists - Unified Music Library Organization")
-    print("="*70)
-    print("\nSelect a feature to run:\n")
-    
-    features = [
-        ("1", "temperament", "4 Temper Analysis"),
-        ("2", "enrich", "Metadata Enrichment"),
-        ("3", "organize", "Playlist Genre Sort"),
-    ]
-    
-    for num, name, description in features:
-        print(f"  {num}. {description}")
-    
-    print("\n  0. Exit\n")
-    print("-"*70)
+    print_header("🎵 affective_playlists", "Unified Music Library Organization")
     
     while True:
         try:
-            choice = input("\nEnter your choice (0-3): ").strip()
+            features = [
+                "🎭 Temperament Analysis - AI emotion classification",
+                "📝 Metadata Enrichment - Fill missing metadata",
+                "📚 Playlist Organization - Genre-based sorting",
+            ]
             
-            if choice == "0":
-                print("\nGoodbye!")
-                return 0
-            elif choice == "1":
+            choice = Menu.select("Select a feature to run", features)
+            
+            if choice == 0:
                 return run_temperament_analysis()
-            elif choice == "2":
+            elif choice == 1:
                 return run_metadata_enrichment()
-            elif choice == "3":
+            elif choice == 2:
                 return run_playlist_organization()
-            else:
-                print("Invalid choice. Please enter 0-3.")
         except KeyboardInterrupt:
-            print("\n\nInterrupted by user. Goodbye!\n")
-            return 130
+            print()
+            if Menu.confirm("Exit affective_playlists?"):
+                print(success("Goodbye!"))
+                return 0
 
 
 def main():

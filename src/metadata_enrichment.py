@@ -6,16 +6,17 @@ ROLE: Core data classes for metadata enrichment pipeline
 ARCHITECTURE: See src/README.md for full architecture
 
 Enriches incomplete metadata (BPM, Genre, Year) for locally stored audio files
-by querying external music databases with per-field "enrich once" strategy.
+by querying external music databases with "exact missing fields" strategy.
 
 Flow:
 1. Detect downloaded tracks (local filesystem presence)
-2. Check which metadata fields are missing/incomplete
-3. Query sources in priority order: Discogs → Last.fm → Wikidata → MusicBrainz → AcousticBrainz
-4. For each FIELD: use first source that has it, skip other sources for that field
-5. Continue through all sources until all fields found or sources exhausted
-6. **No songs skipped** - enriches all available metadata from all sources
-7. Write tags back to audio files with source tracking
+2. Check which metadata fields are MISSING/incomplete
+3. Query sources in priority order ONLY FOR MISSING FIELDS: Discogs → Last.fm → Wikidata → MusicBrainz → AcousticBrainz
+4. For each MISSING FIELD: use first source that has it, skip other sources for that field
+5. Skip searching for fields already present (don't re-enrich existing metadata)
+6. Continue through all sources until all missing fields found or sources exhausted
+7. **No songs skipped** - searches all sources for missing metadata
+8. Write tags back to audio files with source tracking (including which fields were added)
 
 Key Classes:
 - MetadataField: Enum of available metadata fields

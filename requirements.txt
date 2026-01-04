@@ -1,14 +1,17 @@
-# plMetaTemp - Unified Dependencies
-# Shared dependencies for 4tempers, metad_enr, and plsort subprojects
+# affective_playlists - Unified Dependencies
+# Python 3.10+ required
 
 # Core dependencies
-requests>=2.31.0          # HTTP requests (4tempers, metad_enr)
-python-dotenv>=1.0.0      # Environment variable management
+requests>=2.31.0           # HTTP requests (APIs, web enrichment)
+python-dotenv>=1.0.0       # Environment variable management
+openai>=1.0.0              # OpenAI API for temperament analysis
 
-# Optional for development/testing:
-# pytest>=6.0              # For running tests
-# black>=21.0              # Code formatting
-# pylint>=2.0              # Linting
+# Development and code quality (move to requirements-dev.txt if using setuptools)
+pytest>=7.4.0              # Testing framework
+pytest-cov>=4.1.0          # Code coverage for pytest
+pylint>=3.0.0              # Code linting
+black>=23.0.0              # Code formatting
+mypy>=1.7.0                # Static type checking
+isort>=5.12.0              # Import sorting
 
-# Note: Python 3.8+ is required for all subprojects
-# macOS is required for Apple Music integration via AppleScript
+# Note: macOS is required for Apple Music integration via AppleScript

@@ -76,14 +76,16 @@ Fill gaps in music metadata across user's library by querying multiple sources (
 5. **AcousticBrainz** - Audio analysis data (BPM, key, tempo) from MusicBrainz ID
 6. **CoverArtArchive** - Cover art only (separate flow, never required for metadata enrichment)
 
-**Enrich Once Behavior (Per-Field Strategy):**
-- For each FIELD (BPM, Genre, Year, etc.), uses first source that has it
-- Discogs returns Genre + Year → uses those
-- Last.fm returns different Genre → skips (already have Genre from Discogs)
-- Continues querying sources until all fields found OR all sources exhausted
-- **Ensures NO SONGS ARE SKIPPED** - enriches all available metadata
-- Each field enriched once from the highest-priority source that has it
-- Improves performance while ensuring complete enrichment
+**Enrich Once Behavior (Exact Missing Fields Strategy):**
+- Identifies which fields are MISSING from the track metadata
+- Only searches for those specific missing fields (not already-present fields)
+- Discogs returns Genre + Year (if both are missing) → collects both
+- Last.fm returns Genre (already found from Discogs) → skips Genre
+- Continues querying sources for remaining missing fields until all found OR sources exhausted
+- **Ensures NO SONGS ARE SKIPPED** - searches all sources for missing metadata
+- Each missing field enriched once from the highest-priority source that has it
+- Improves performance by only searching for what's actually needed
+- Example: Track missing BPM + Year → Queries until both found, skips already-present Genre
 
 Each database:
 - Discogs: Genre, release year, catalog information (first queried)
