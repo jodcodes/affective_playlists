@@ -74,16 +74,29 @@ class PlaylistClassifier:
                 logger.warning(f"Failed to load artist list for {genre}: {e}")
                 
         return artist_lists
+    
+    def add_analyzed_artists(self, genre: str, artists: List[str]) -> None:
+        """
+        Add analyzed artists to a genre from database queries.
+        
+        Args:
+            genre: Target genre to add artists to
+            artists: List of artist names to add
+        """
+        if genre not in self.artist_lists:
+            self.artist_lists[genre] = {'artists': [], 'keywords': []}
+        
+        # Normalize and add artists if not already present
+        existing_artists = set(self.artist_lists[genre].get('artists', []))
+        for artist in artists:
+            normalized_artist = self.normalizer.normalize(artist)
+            if normalized_artist not in existing_artists:
+                self.artist_lists[genre]['artists'].append(normalized_artist)
+                existing_artists.add(normalized_artist)
+        
+        logger.debug(f"Added {len(artists)} analyzed artists to genre: {genre}")
 
-    def normalize_metadata(self, metadata: Dict[str, Any]) -> Dict[str, Any]:
-        """Normalize metadata fields."""
-        normalized = {}
-        for key, value in metadata.items():
-            if isinstance(value, str):
-                normalized[key] = self.normalizer.normalize(value)
-            else:
-                normalized[key] = value
-        return normalized
+
 
     def map_genre_to_target(self, raw_genre: str) -> Optional[str]:
         """
@@ -123,23 +136,7 @@ class PlaylistClassifier:
                 
         return None
 
-    def calculate_bpm_score(self, bpm: float, genre: str) -> float:
-        """Calculate BPM-based score for a genre."""
-        if not bpm or genre not in self.weights.get('bpm_ranges', {}):
-            return 0.0
-            
-        bpm_range = self.weights['bpm_ranges'][genre]
-        min_bpm, max_bpm = bpm_range[0], bpm_range[1]
-        
-        if min_bpm <= bpm <= max_bpm:
-            return self.weights.get('bpm_match', 1)
-        else:
-            # Partial score for close BPM values
-            distance = min(abs(bpm - min_bpm), abs(bpm - max_bpm))
-            if distance <= 10:  # Within 10 BPM tolerance
-                return self.weights.get('bpm_match', 1) * 0.5
-                
-        return 0.0
+
 
     def score_track(self, track: Dict[str, Any]) -> Dict[str, float]:
         """
@@ -151,20 +148,20 @@ class PlaylistClassifier:
         Returns:
             Dictionary mapping genre names to scores
         """
-        normalized = self.normalize_metadata(track)
         genre_scores = defaultdict(float)
         
-        # Extract normalized fields
-        track_genre = normalized.get('genre', '')
-        track_artist = normalized.get('artist', '')
-        track_composer = normalized.get('composer', '')
-        track_bpm = normalized.get('bpm', 0)
-        
-        # Convert BPM to float if it's a string
-        try:
-            track_bpm = float(track_bpm) if track_bpm else 0
-        except (ValueError, TypeError):
-            track_bpm = 0
+        # Extract fields
+        track_genre = track.get('genre', '')
+        if isinstance(track_genre, str):
+            track_genre = self.normalizer.normalize(track_genre)
+            
+        track_artist = track.get('artist', '')
+        if isinstance(track_artist, str):
+            track_artist = self.normalizer.normalize(track_artist)
+            
+        track_composer = track.get('composer', '')
+        if isinstance(track_composer, str):
+            track_composer = self.normalizer.normalize(track_composer)
             
         for target_genre in self.target_genres:
             genre_data = self.artist_lists.get(target_genre, {})
@@ -191,10 +188,6 @@ class PlaylistClassifier:
             if track_composer and target_genre in ['jazz', 'world']:
                 if 'artists' in genre_data and track_composer in genre_data['artists']:
                     score += self.weights.get('composer_match', 1)
-                    
-            # BPM match scoring (for electronic/disco)
-            if track_bpm > 0 and target_genre in ['electronic', 'disco_funk_soul']:
-                score += self.calculate_bpm_score(track_bpm, target_genre)
                 
             genre_scores[target_genre] = score
             
