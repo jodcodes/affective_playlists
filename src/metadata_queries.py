@@ -25,12 +25,6 @@ Example (Track missing: BPM, Year. Already has: Genre):
 - MusicBrainz returns: BPM, Year → skip Year (found), collect BPM
 - Result: Year (Discogs), BPM (MusicBrainz), Genre (unchanged)
 
-All queries are read-only. No rate-limited API keys are required.
-Implements caching to minimize requests.
-
-SSL Certificate Handling:
-- Fixed for macOS Python 3.12+ with certifi certificate bundle
-- Both MusicBrainzQuery and other classes use explicit SSL context
 """
 
 import json
