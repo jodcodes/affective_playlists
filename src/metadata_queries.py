@@ -128,20 +128,23 @@ class MusicBrainzQuery(DatabaseQuery):
 
         self.logger.debug(f"Found MusicBrainz recording: {recording.get('id')}")
 
-        # Extract metadata from recording
-        if 'title' in recording:
-            results[MetadataField.GENRE] = (recording['title'], 1.0)
-
+        # Extract year from release date
         if 'first-release-date' in recording:
             year = recording['first-release-date'].split('-')[0]
             results[MetadataField.YEAR] = (year, 0.9)
 
-        # Get genre from release if available
+        # Try to extract genre from release first, then from recording tags
+        genre = None
         if 'releases' in recording and recording['releases']:
             release = recording['releases'][0]
             genre = self._extract_genre_from_release(release)
-            if genre:
-                results[MetadataField.GENRE] = (genre, 0.7)
+        
+        # If no genre from release, try recording tags
+        if not genre and 'tags' in recording:
+            genre = self._extract_tags(recording['tags'])
+        
+        if genre:
+            results[MetadataField.GENRE] = (genre, 0.7)
 
         return results
 
@@ -176,10 +179,15 @@ class MusicBrainzQuery(DatabaseQuery):
         # MusicBrainz doesn't have explicit genre field in older API
         # Check for tags or other genre indicators
         if 'tags' in release:
-            tags = release['tags']
-            if isinstance(tags, list) and tags:
-                return tags[0].get('name')
-
+            return self._extract_tags(release['tags'])
+        return None
+    
+    def _extract_tags(self, tags) -> Optional[str]:
+        """Extract first tag name from MusicBrainz tags."""
+        if isinstance(tags, list) and tags:
+            first_tag = tags[0]
+            if isinstance(first_tag, dict) and 'name' in first_tag:
+                return first_tag.get('name')
         return None
 
 
