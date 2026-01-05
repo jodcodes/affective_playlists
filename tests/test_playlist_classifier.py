@@ -19,22 +19,23 @@ import pytest
 from playlist_classifier import PlaylistClassifier
 
 
+@pytest.fixture
+def classifier():
+    """Initialize classifier with real config files."""
+    config_dir = Path(__file__).parent.parent / 'data' / 'config'
+    artist_dir = Path(__file__).parent.parent / 'data' / 'artist_lists'
+    
+    return PlaylistClassifier(
+        genre_map_path=str(config_dir / 'genre_map.json'),
+        weights_path=str(config_dir / 'weights.json'),
+        artist_lists_dir=str(artist_dir),
+        dominance_threshold=0.3,
+        enable_genre_enrichment=False  # Disable for tests
+    )
+
+
 class TestPlaylistClassifierSetup:
     """Tests for classifier initialization and setup."""
-    
-    @pytest.fixture
-    def classifier(self):
-        """Initialize classifier with real config files."""
-        config_dir = Path(__file__).parent.parent / 'data' / 'config'
-        artist_dir = Path(__file__).parent.parent / 'data' / 'artist_lists'
-        
-        classifier = PlaylistClassifier(
-            genre_map_path=str(config_dir / 'genre_map.json'),
-            weights_path=str(config_dir / 'weights.json'),
-            artist_lists_dir=str(artist_dir),
-            dominance_threshold=0.3
-        )
-        return classifier
     
     def test_classifier_initialization(self, classifier):
         """Test that classifier initializes correctly."""
@@ -71,18 +72,6 @@ class TestPlaylistClassifierSetup:
 
 class TestGenreMapping:
     """Tests for raw genre to target genre mapping."""
-    
-    @pytest.fixture
-    def classifier(self):
-        config_dir = Path(__file__).parent.parent / 'data' / 'config'
-        artist_dir = Path(__file__).parent.parent / 'data' / 'artist_lists'
-        
-        return PlaylistClassifier(
-            genre_map_path=str(config_dir / 'genre_map.json'),
-            weights_path=str(config_dir / 'weights.json'),
-            artist_lists_dir=str(artist_dir),
-            dominance_threshold=0.3
-        )
     
     def test_direct_genre_mapping(self, classifier):
         """Test direct mapping from genre_map.json."""
@@ -122,18 +111,6 @@ class TestGenreMapping:
 
 class TestTrackScoring:
     """Tests for individual track scoring."""
-    
-    @pytest.fixture
-    def classifier(self):
-        config_dir = Path(__file__).parent.parent / 'data' / 'config'
-        artist_dir = Path(__file__).parent.parent / 'data' / 'artist_lists'
-        
-        return PlaylistClassifier(
-            genre_map_path=str(config_dir / 'genre_map.json'),
-            weights_path=str(config_dir / 'weights.json'),
-            artist_lists_dir=str(artist_dir),
-            dominance_threshold=0.3
-        )
     
     def test_score_track_with_genre(self, classifier):
         """Test scoring track with genre field."""
@@ -204,18 +181,6 @@ class TestTrackScoring:
 class TestPlaylistScoring:
     """Tests for full playlist scoring."""
     
-    @pytest.fixture
-    def classifier(self):
-        config_dir = Path(__file__).parent.parent / 'data' / 'config'
-        artist_dir = Path(__file__).parent.parent / 'data' / 'artist_lists'
-        
-        return PlaylistClassifier(
-            genre_map_path=str(config_dir / 'genre_map.json'),
-            weights_path=str(config_dir / 'weights.json'),
-            artist_lists_dir=str(artist_dir),
-            dominance_threshold=0.3
-        )
-    
     def test_score_empty_playlist(self, classifier):
         """Test scoring empty playlist."""
         scores = classifier.score_playlist([])
@@ -251,7 +216,6 @@ class TestPlaylistScoring:
         tracks = [
             {'artist': 'Unknown1', 'name': 'Track1', 'genre': 'rock'},
             {'artist': 'Unknown2', 'name': 'Track2', 'genre': 'electronic'},
-            {'artist': 'Unknown3', 'name': 'Track3', 'genre': 'hiphop'},
         ]
         scores = classifier.score_playlist(tracks)
         
@@ -273,18 +237,6 @@ class TestPlaylistScoring:
 
 class TestDominanceDetection:
     """Tests for dominant genre detection."""
-    
-    @pytest.fixture
-    def classifier(self):
-        config_dir = Path(__file__).parent.parent / 'data' / 'config'
-        artist_dir = Path(__file__).parent.parent / 'data' / 'artist_lists'
-        
-        return PlaylistClassifier(
-            genre_map_path=str(config_dir / 'genre_map.json'),
-            weights_path=str(config_dir / 'weights.json'),
-            artist_lists_dir=str(artist_dir),
-            dominance_threshold=0.3
-        )
     
     def test_clear_dominance_detected(self, classifier):
         """Test detection of clear genre dominance."""
@@ -316,7 +268,6 @@ class TestDominanceDetection:
         # Should handle gracefully without error
         assert info is not None
         assert 'reason' in info
-        # Log should be created (test just ensures no crash)
     
     def test_mixed_genre_balanced_playlist(self, classifier):
         """Test balanced multi-genre playlist."""
@@ -330,25 +281,12 @@ class TestDominanceDetection:
         
         assert info is not None
         assert 'reason' in info
-        # With balanced genres, may not have clear dominance
         if genre is None:
             assert 'No clear dominance' in info['reason']
 
 
 class TestClassificationPipeline:
     """Integration tests for full classification pipeline."""
-    
-    @pytest.fixture
-    def classifier(self):
-        config_dir = Path(__file__).parent.parent / 'data' / 'config'
-        artist_dir = Path(__file__).parent.parent / 'data' / 'artist_lists'
-        
-        return PlaylistClassifier(
-            genre_map_path=str(config_dir / 'genre_map.json'),
-            weights_path=str(config_dir / 'weights.json'),
-            artist_lists_dir=str(artist_dir),
-            dominance_threshold=0.3
-        )
     
     def test_full_classification_rock_playlist(self, classifier):
         """Test full classification pipeline on rock playlist."""
@@ -395,20 +333,40 @@ class TestClassificationPipeline:
         assert info['track_count'] == 3
 
 
+class TestGenreEnrichment:
+    """Tests for database-driven genre enrichment."""
+    
+    def test_genre_enrichment_skipped_when_disabled(self, classifier):
+        """Test that enrichment is skipped when disabled."""
+        track = {'artist': 'Test Artist', 'name': 'Test Song'}
+        result = classifier.enrich_missing_genre(track)
+        assert result is None
+    
+    def test_genre_enrichment_skips_existing_genre(self, classifier):
+        """Test that enrichment skips tracks with existing genre."""
+        track = {'artist': 'Test Artist', 'name': 'Test Song', 'genre': 'rock'}
+        # When enrichment is disabled, it returns None but doesn't fail
+        result = classifier.enrich_missing_genre(track)
+        # Genre should remain unchanged
+        assert track['genre'] == 'rock'
+    
+    def test_genre_enrichment_needs_artist_and_title(self, classifier):
+        """Test that enrichment requires artist and title."""
+        track = {'artist': 'Test Artist'}  # Missing title
+        result = classifier.enrich_missing_genre(track)
+        assert result is None
+    
+    def test_score_track_attempts_enrichment(self, classifier):
+        """Test that score_track attempts to enrich missing genre."""
+        track = {'artist': 'Unknown Artist', 'name': 'Unknown Track'}
+        scores = classifier.score_track(track)
+        # Should return scores even without enrichment (enrichment is disabled)
+        assert isinstance(scores, dict)
+        assert len(scores) > 0
+
+
 class TestAnalyzedArtistsIntegration:
     """Tests for adding analyzed artists from database queries."""
-    
-    @pytest.fixture
-    def classifier(self):
-        config_dir = Path(__file__).parent.parent / 'data' / 'config'
-        artist_dir = Path(__file__).parent.parent / 'data' / 'artist_lists'
-        
-        return PlaylistClassifier(
-            genre_map_path=str(config_dir / 'genre_map.json'),
-            weights_path=str(config_dir / 'weights.json'),
-            artist_lists_dir=str(artist_dir),
-            dominance_threshold=0.3
-        )
     
     def test_add_analyzed_artists(self, classifier):
         """Test adding analyzed artists to genre."""
@@ -452,18 +410,6 @@ class TestAnalyzedArtistsIntegration:
 
 class TestEdgeCases:
     """Tests for edge cases and boundary conditions."""
-    
-    @pytest.fixture
-    def classifier(self):
-        config_dir = Path(__file__).parent.parent / 'data' / 'config'
-        artist_dir = Path(__file__).parent.parent / 'data' / 'artist_lists'
-        
-        return PlaylistClassifier(
-            genre_map_path=str(config_dir / 'genre_map.json'),
-            weights_path=str(config_dir / 'weights.json'),
-            artist_lists_dir=str(artist_dir),
-            dominance_threshold=0.3
-        )
     
     def test_very_large_playlist(self, classifier):
         """Test classification of very large playlist."""

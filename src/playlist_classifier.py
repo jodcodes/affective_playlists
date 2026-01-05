@@ -5,8 +5,11 @@ from typing import Dict, List, Tuple, Optional, Any
 from collections import defaultdict, Counter
 import math
 import re
+import logging
 from normalizer import TextNormalizer
 from logger import setup_logger
+from metadata_queries import MetadataQueryOrchestrator
+from metadata_enrichment import MetadataField
 
 logger = setup_logger(__name__)
 
@@ -17,7 +20,10 @@ class PlaylistClassifier:
     """
     
     def __init__(self, genre_map_path: str, weights_path: str, artist_lists_dir: str, 
-                 dominance_threshold: float = 0.3):
+                 dominance_threshold: float = 0.3,
+                 lastfm_api_key: Optional[str] = None,
+                 discogs_token: Optional[str] = None,
+                 enable_genre_enrichment: bool = True):
         """
         Initialize the playlist classifier.
         
@@ -26,6 +32,9 @@ class PlaylistClassifier:
             weights_path: Path to scoring weights JSON file  
             artist_lists_dir: Path to directory containing artist lists JSON files
             dominance_threshold: Minimum score ratio required for genre dominance
+            lastfm_api_key: Optional Last.fm API key for metadata enrichment
+            discogs_token: Optional Discogs API token for metadata enrichment
+            enable_genre_enrichment: Enable querying databases for missing genre metadata
         """
         # Initialize normalizer first
         self.normalizer = TextNormalizer()
@@ -35,6 +44,20 @@ class PlaylistClassifier:
         self.weights = self.load_json(weights_path)
         self.artist_lists = self.load_artist_lists(artist_lists_dir)
         self.dominance_threshold = dominance_threshold
+        self.enable_genre_enrichment = enable_genre_enrichment
+        
+        # Initialize metadata query orchestrator for genre enrichment
+        self.metadata_orchestrator: Optional[MetadataQueryOrchestrator] = None
+        if enable_genre_enrichment:
+            try:
+                self.metadata_orchestrator = MetadataQueryOrchestrator(
+                    lastfm_api_key=lastfm_api_key,
+                    discogs_token=discogs_token,
+                    logger=logger
+                )
+                logger.info("Initialized metadata query orchestrator for genre enrichment")
+            except Exception as e:
+                logger.warning(f"Failed to initialize metadata orchestrator: {e}")
         
         # Extract target genres from artist lists
         self.target_genres = list(self.artist_lists.keys())
@@ -95,6 +118,60 @@ class PlaylistClassifier:
                 existing_artists.add(normalized_artist)
         
         logger.debug(f"Added {len(artists)} analyzed artists to genre: {genre}")
+    
+    def enrich_missing_genre(self, track: Dict[str, Any]) -> Optional[str]:
+        """
+        Enrich missing genre metadata by querying external databases.
+        
+        If track lacks a genre field, queries MusicBrainz, Last.fm, Discogs, etc.
+        in priority order to find genre information. Applies the most reliable
+        genre found to the track dictionary.
+        
+        Args:
+            track: Track metadata dictionary (will be modified in-place if enriched)
+            
+        Returns:
+            Enriched genre string if found, None otherwise
+        """
+        # Skip if enrichment disabled
+        if not self.enable_genre_enrichment or not self.metadata_orchestrator:
+            return None
+        
+        # Skip if track already has genre
+        existing_genre = track.get('genre')
+        if existing_genre and isinstance(existing_genre, str) and existing_genre.strip():
+            return existing_genre.strip()
+        
+        # Extract artist and title
+        artist = track.get('artist', '').strip()
+        title = track.get('name', '').strip()
+        
+        if not artist or not title:
+            logger.debug(f"Cannot enrich genre: missing artist or title")
+            return None
+        
+        try:
+            # Query databases looking specifically for genre field
+            logger.debug(f"Enriching missing genre for: {artist} - {title}")
+            entries = self.metadata_orchestrator.query_all_sources(
+                artist=artist,
+                title=title,
+                enrich_once=True,
+                missing_fields=[MetadataField.GENRE]
+            )
+            
+            if entries:
+                # Use first (highest-priority) genre found
+                genre_entry = entries[0]
+                enriched_genre = genre_entry.value
+                track['genre'] = enriched_genre
+                logger.debug(f"Enriched genre from {genre_entry.source.name}: {enriched_genre}")
+                return enriched_genre
+            
+        except Exception as e:
+            logger.warning(f"Failed to enrich genre for {artist} - {title}: {e}")
+        
+        return None
 
 
 
@@ -142,6 +219,8 @@ class PlaylistClassifier:
         """
         Score a single track against all target genres.
         
+        Enriches missing genre metadata from external databases before scoring.
+        
         Args:
             track: Track metadata dictionary
             
@@ -150,8 +229,14 @@ class PlaylistClassifier:
         """
         genre_scores = defaultdict(float)
         
+        # Enrich missing genre from databases
+        track_genre_raw = track.get('genre', '')
+        if not (isinstance(track_genre_raw, str) and track_genre_raw.strip()):
+            self.enrich_missing_genre(track)
+            track_genre_raw = track.get('genre', '')
+        
         # Extract fields
-        track_genre = track.get('genre', '')
+        track_genre = track_genre_raw
         if isinstance(track_genre, str):
             track_genre = self.normalizer.normalize(track_genre)
             
