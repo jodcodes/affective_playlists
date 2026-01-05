@@ -36,6 +36,10 @@ from playlist_manager import PlaylistManager
 from apple_music import AppleMusicInterface
 from config import load_centralized_whitelist, get_filtered_playlists
 
+# Shared modules
+from models import Playlist
+from playlist_utils import PlaylistSelector, PlaylistWhitelistFilter
+
 logger = setup_logger(__name__)
 
 
@@ -242,43 +246,24 @@ def organize_classified_playlists(classification_results: Dict[str, tuple],
     return organization_results
 
 
-def get_user_playlist_selection(apple_music: AppleMusicInterface, whitelist_only: bool = False) -> Optional[List[str]]:
+def get_user_playlist_selection(playlist_names: List[str], whitelist_only: bool = False) -> Optional[List[str]]:
     """
     Get playlist selection from user via interactive menu.
     
     Args:
-        apple_music: Apple Music interface instance
-        whitelist_only: If True, only show whitelisted playlists regardless of whitelist setting
+        playlist_names: List of available playlist names
+        whitelist_only: If True, show mode indicator
         
     Returns:
         List of selected playlist names or None if cancelled
     """
     try:
-        print("\nConnecting to Apple Music...")
-        all_playlist_names = apple_music.get_playlist_names()
-        
-        if not all_playlist_names:
-            print("No playlists found in Apple Music.")
+        if not playlist_names:
+            print("No playlists available for selection.")
             return None
         
         # Load whitelist configuration
         whitelist_enabled, whitelist = load_centralized_whitelist()
-        
-        # Determine which playlists to show
-        if whitelist_only or whitelist_enabled:
-            playlist_names = [name for name in all_playlist_names if name in whitelist]
-            
-            if whitelist_only:
-                print(f"Whitelist mode: Showing {len(playlist_names)} whitelisted playlists out of {len(all_playlist_names)} total")
-            else:
-                print(f"Whitelist enabled: Found {len(playlist_names)} whitelisted playlists out of {len(all_playlist_names)} total")
-            
-            if not playlist_names:
-                print("No whitelisted playlists found.")
-                return None
-        else:
-            playlist_names = all_playlist_names
-            print(f"Whitelist disabled: Found {len(playlist_names)} playlists in Apple Music")
         
         # Show playlist selection menu
         print("\n" + "="*70)
@@ -372,12 +357,18 @@ def run_playlist_organization(dry_run: bool = False, verbose: bool = False,
         logger.info(f"Processing {len(selected_playlists)} pre-selected playlists")
     elif select_from_whitelist:
         # Force interactive mode with whitelist only
-        selected_playlists = get_user_playlist_selection(apple_music, whitelist_only=True)
+        all_playlist_names = apple_music.get_playlist_names()
+        whitelist_enabled, whitelist = load_centralized_whitelist()
+        filtered_names = [name for name in all_playlist_names if name in whitelist] if whitelist_enabled else all_playlist_names
+        selected_playlists = get_user_playlist_selection(filtered_names, whitelist_only=True)
         if not selected_playlists:
             print("No playlists selected. Exiting.")
             return 0
     elif interactive:
-        selected_playlists = get_user_playlist_selection(apple_music, whitelist_only=False)
+        all_playlist_names = apple_music.get_playlist_names()
+        whitelist_enabled, whitelist = load_centralized_whitelist()
+        filtered_names = [name for name in all_playlist_names if name in whitelist] if whitelist_enabled else all_playlist_names
+        selected_playlists = get_user_playlist_selection(filtered_names, whitelist_only=False)
         if not selected_playlists:
             print("No playlists selected. Exiting.")
             return 0

@@ -13,6 +13,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from metadata_fill import MetadataFiller
+from playlist_utils import PlaylistFuzzyMatcher
 
 
 class TestPlaylistFuzzyMatching:
@@ -20,51 +21,46 @@ class TestPlaylistFuzzyMatching:
     
     def test_find_playlist_exact_match(self):
         """Test exact match returns correct ID."""
-        filler = MetadataFiller()
         playlist_ids = {
             'gc 3-Martini Sound': 'A1B2C3D4E5F6A7B8',
             'My Playlist': 'B2C3D4E5F6B7C8D9'
         }
         
-        result = filler._find_playlist_fuzzy('gc 3-Martini Sound', playlist_ids)
+        result = PlaylistFuzzyMatcher.find_playlist_by_name('gc 3-Martini Sound', playlist_ids)
         assert result == 'A1B2C3D4E5F6A7B8'
     
     def test_find_playlist_case_insensitive(self):
         """Test case-insensitive matching."""
-        filler = MetadataFiller()
         playlist_ids = {
             'gc 3-Martini Sound': 'A1B2C3D4E5F6A7B8'
         }
         
         # Try different cases
-        assert filler._find_playlist_fuzzy('GC 3-MARTINI SOUND', playlist_ids) == 'A1B2C3D4E5F6A7B8'
-        assert filler._find_playlist_fuzzy('gc 3-martini sound', playlist_ids) == 'A1B2C3D4E5F6A7B8'
+        assert PlaylistFuzzyMatcher.find_playlist_by_name('GC 3-MARTINI SOUND', playlist_ids) == 'A1B2C3D4E5F6A7B8'
+        assert PlaylistFuzzyMatcher.find_playlist_by_name('gc 3-martini sound', playlist_ids) == 'A1B2C3D4E5F6A7B8'
     
     def test_find_playlist_fuzzy_partial_match(self):
         """Test fuzzy matching with similar names (>80% similarity)."""
-        filler = MetadataFiller()
         playlist_ids = {
             'gc 3-Martini Sound': 'A1B2C3D4E5F6A7B8'
         }
         
         # Should match with high similarity
-        result = filler._find_playlist_fuzzy('gc 3-Martini', playlist_ids)
+        result = PlaylistFuzzyMatcher.find_playlist_by_name('gc 3-Martini', playlist_ids)
         assert result == 'A1B2C3D4E5F6A7B8'
     
     def test_find_playlist_not_found(self):
         """Test returns None when no match found."""
-        filler = MetadataFiller()
         playlist_ids = {
             'gc 3-Martini Sound': 'A1B2C3D4E5F6A7B8'
         }
         
-        result = filler._find_playlist_fuzzy('Nonexistent Playlist', playlist_ids)
+        result = PlaylistFuzzyMatcher.find_playlist_by_name('Nonexistent Playlist', playlist_ids)
         assert result is None
     
     def test_find_playlist_empty_dict(self):
         """Test handles empty playlist dictionary."""
-        filler = MetadataFiller()
-        result = filler._find_playlist_fuzzy('Any Playlist', {})
+        result = PlaylistFuzzyMatcher.find_playlist_by_name('Any Playlist', {})
         assert result is None
     
     def test_get_playlist_ids_extracts_hex_ids(self):
@@ -84,7 +80,6 @@ class TestPlaylistFuzzyMatching:
     
     def test_special_characters_in_playlist_name(self):
         """Test playlist names with special characters."""
-        filler = MetadataFiller()
         playlist_ids = {
             'gc 3-Martini Sound': 'A1B2C3D4E5F6A7B8',
             "Rock & Roll": 'B2C3D4E5F6B7C8D9',
@@ -92,31 +87,29 @@ class TestPlaylistFuzzyMatching:
         }
         
         # Exact matches should work
-        assert filler._find_playlist_fuzzy('gc 3-Martini Sound', playlist_ids)
-        assert filler._find_playlist_fuzzy("Rock & Roll", playlist_ids)
-        assert filler._find_playlist_fuzzy("80's Classics", playlist_ids)
+        assert PlaylistFuzzyMatcher.find_playlist_by_name('gc 3-Martini Sound', playlist_ids)
+        assert PlaylistFuzzyMatcher.find_playlist_by_name("Rock & Roll", playlist_ids)
+        assert PlaylistFuzzyMatcher.find_playlist_by_name("80's Classics", playlist_ids)
     
     def test_multiple_similar_names_picks_best(self):
         """Test when multiple playlists are similar."""
-        filler = MetadataFiller()
         playlist_ids = {
             'Playlist A': 'A1B2C3D4E5F6A7B8',
             'Playlist B': 'B2C3D4E5F6B7C8D9'
         }
         
         # Should find exact match first
-        result = filler._find_playlist_fuzzy('Playlist A', playlist_ids)
+        result = PlaylistFuzzyMatcher.find_playlist_by_name('Playlist A', playlist_ids)
         assert result == 'A1B2C3D4E5F6A7B8'
     
     def test_whitespace_handling(self):
         """Test handling of extra whitespace."""
-        filler = MetadataFiller()
         playlist_ids = {
             'gc 3-Martini Sound': 'A1B2C3D4E5F6A7B8'
         }
         
         # Normalize and match
-        result = filler._find_playlist_fuzzy('gc  3-Martini  Sound', playlist_ids)
+        result = PlaylistFuzzyMatcher.find_playlist_by_name('gc  3-Martini  Sound', playlist_ids)
         # Should match due to case-insensitive + fuzzy matching
         assert result is not None
 
@@ -126,37 +119,34 @@ class TestPlaylistMatchingEdgeCases:
     
     def test_unicode_playlist_names(self):
         """Test playlist names with unicode characters."""
-        filler = MetadataFiller()
         playlist_ids = {
             'Café Vibes': 'A1B2C3D4E5F6A7B8',
             '日本語プレイリスト': 'B2C3D4E5F6B7C8D9'
         }
         
         # Should match exactly
-        assert filler._find_playlist_fuzzy('Café Vibes', playlist_ids) == 'A1B2C3D4E5F6A7B8'
+        assert PlaylistFuzzyMatcher.find_playlist_by_name('Café Vibes', playlist_ids) == 'A1B2C3D4E5F6A7B8'
     
     def test_numbers_in_playlist_name(self):
         """Test playlist names with numbers."""
-        filler = MetadataFiller()
         playlist_ids = {
             '90s Hits': 'A1B2C3D4E5F6A7B8',
             '2000s Mix': 'B2C3D4E5F6B7C8D9',
             'Top 100': 'C3D4E5F6B7C8D9A0'
         }
         
-        assert filler._find_playlist_fuzzy('90s Hits', playlist_ids) == 'A1B2C3D4E5F6A7B8'
-        assert filler._find_playlist_fuzzy('2000s Mix', playlist_ids) == 'B2C3D4E5F6B7C8D9'
-        assert filler._find_playlist_fuzzy('Top 100', playlist_ids) == 'C3D4E5F6B7C8D9A0'
+        assert PlaylistFuzzyMatcher.find_playlist_by_name('90s Hits', playlist_ids) == 'A1B2C3D4E5F6A7B8'
+        assert PlaylistFuzzyMatcher.find_playlist_by_name('2000s Mix', playlist_ids) == 'B2C3D4E5F6B7C8D9'
+        assert PlaylistFuzzyMatcher.find_playlist_by_name('Top 100', playlist_ids) == 'C3D4E5F6B7C8D9A0'
     
     def test_cutoff_threshold_80_percent(self):
         """Test that fuzzy matching respects 80% cutoff."""
-        filler = MetadataFiller()
         playlist_ids = {
             'Completely Different Name': 'A1B2C3D4E5F6A7B8'
         }
         
         # Should not match (too dissimilar)
-        result = filler._find_playlist_fuzzy('xyz abc def', playlist_ids)
+        result = PlaylistFuzzyMatcher.find_playlist_by_name('xyz abc def', playlist_ids)
         assert result is None
 
 

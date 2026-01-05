@@ -38,9 +38,15 @@ if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
 from apple_music import AppleMusicInterface
+from logger import setup_logger
 
 # Add src to path for local imports
 sys.path.insert(0, os.path.dirname(__file__))
+
+# Shared modules
+from models import Track, Playlist
+from playlist_utils import PlaylistFuzzyMatcher
+
 from audio_tags import TagManager
 from metadata_enrichment import (
     MetadataEnricher, DownloadedTrackDetector, TrackIdentifier, MetadataField
@@ -71,7 +77,7 @@ class MetadataFiller:
         Args:
             logger: Optional logger instance
         """
-        self.logger = logger or logging.getLogger(__name__)
+        self.logger = logger or setup_logger(__name__)
         # Point to scripts directory in src/scripts
         scripts_dir = os.path.join(os.path.dirname(__file__), 'scripts')
         self.apple_music = AppleMusicInterface(scripts_dir)
@@ -100,8 +106,6 @@ class MetadataFiller:
         # Load shared configs
         self.whitelist_enabled, self.whitelist = self._load_whitelist()
         self.playlist_folders_config = self._load_playlist_folders_config()
-        # Cache for playlist IDs
-        self._playlist_ids_cache = None
     
     @staticmethod
     def _load_whitelist():
@@ -122,116 +126,7 @@ class MetadataFiller:
         except Exception as e:
             self.logger.warning(f"Could not load playlist folders config: {e}")
             return {}
-    
-    def _find_playlist_fuzzy(self, playlist_name: str, playlist_ids: dict) -> Optional[str]:
-        """
-        Fuzzy match playlist name (case-insensitive, handles partial matches).
-        
-        Args:
-            playlist_name: Name to search for
-            playlist_ids: Dictionary of available playlists
-            
-        Returns:
-            Playlist ID if found, None otherwise
-        """
-        import difflib
-        
-        if not playlist_ids:
-            return None
-        
-        # Exact case-insensitive match
-        for name in playlist_ids.keys():
-            if name.lower() == playlist_name.lower():
-                self.logger.debug(f"Fuzzy match (case-insensitive): {playlist_name} -> {name}")
-                return playlist_ids[name]
-        
-        # Fuzzy string matching using difflib (>80% similarity)
-        playlist_list = list(playlist_ids.keys())
-        matches = difflib.get_close_matches(
-            playlist_name.lower(),
-            [n.lower() for n in playlist_list],
-            n=1,
-            cutoff=0.8
-        )
-        
-        if matches:
-            # Find original name with correct casing
-            idx = [n.lower() for n in playlist_list].index(matches[0])
-            original_name = playlist_list[idx]
-            self.logger.debug(f"Fuzzy match (similarity): {playlist_name} -> {original_name}")
-            return playlist_ids[original_name]
-        
-        return None
-    
-    def _get_playlist_ids(self) -> dict:
-        """Get all user playlists with their persistent IDs
-        
-        Returns:
-            Dictionary mapping playlist names to their hex IDs
-        """
-        if self._playlist_ids_cache is not None:
-            return self._playlist_ids_cache
-        
-        try:
-            # self.apple_music.scripts_dir is already pointing to the scripts directory
-            script_path = os.path.join(self.apple_music.scripts_dir, 'get_ids_playlists.applescript')
-            import subprocess
-            result = subprocess.run(['osascript', script_path], capture_output=True, text=True, timeout=30)
-            
-            if not result.stdout:
-                self.logger.error("Failed to get playlist IDs")
-                return {}
-            
-            import re
-            playlists = {}
-            
-            # Find all hex IDs (16 hex digits) and look backward for "name:" label
-            # IDs are always exactly 16 hex digits
-            id_pattern = r'([A-F0-9]{16})'
-            id_matches = list(re.finditer(id_pattern, result.stdout, re.IGNORECASE))
-            
-            if not id_matches:
-                self.logger.warning("No playlist IDs found in output")
-                return {}
-            
-            # For each ID found, work backward to find the corresponding name
-            output = result.stdout
-            
-            for id_match in id_matches:
-                hex_id = id_match.group(1)
-                # Look backward from the ID match
-                pos = id_match.start()
-                before_id = output[:pos]
-                
-                # Find the last "name:" before this ID
-                # Match: name:VALUE where VALUE can have spaces, hyphens, numbers, letters
-                name_pattern = r'name:([^,]*?)(?:,\s*id:|$)'
-                name_matches = list(re.finditer(name_pattern, before_id))
-                
-                if name_matches:
-                    # Get the last (most recent) name match
-                    last_name_match = name_matches[-1]
-                    name = last_name_match.group(1).strip()
-                    
-                    # Remove quotes if present
-                    if name.startswith("'") and name.endswith("'"):
-                        name = name[1:-1]
-                    elif name.startswith("\"") and name.endswith("\""):
-                        name = name[1:-1]
-                    
-                    if name:  # Only add if we got a valid name
-                        playlists[name] = hex_id
-                        self.logger.debug(f"Found playlist: {name} -> {hex_id}")
-            
-            if not playlists:
-                self.logger.warning("No valid playlist name/ID pairs found")
-            
-            self._playlist_ids_cache = playlists
-            return playlists
-            
-        except Exception as e:
-            self.logger.error(f"Error getting playlist IDs: {e}")
-            return {}
+
 
     def fill_playlist(self, playlist_name: str, force: bool = False) -> Dict:
         """
@@ -244,16 +139,12 @@ class MetadataFiller:
         Returns:
             Dictionary with results
         """
-        # Get playlist ID
+        # Get playlist ID using shared utilities
         self.logger.info(f"Loading playlist: {playlist_name}")
-        playlist_ids = self._get_playlist_ids()
+        playlist_ids = self.apple_music.get_playlist_ids()
         
-        # Try exact match first
-        playlist_id = playlist_ids.get(playlist_name)
-        
-        # If not found, try fuzzy matching (case-insensitive, normalized)
-        if not playlist_id:
-            playlist_id = self._find_playlist_fuzzy(playlist_name, playlist_ids)
+        # Use fuzzy matching from shared utilities
+        playlist_id = PlaylistFuzzyMatcher.find_playlist_by_name(playlist_name, playlist_ids)
         
         if not playlist_id:
             # List available playlists for user
@@ -614,46 +505,15 @@ class MetadataFillCLI:
 
     def _setup_logging(self) -> logging.Logger:
         """Setup logging for CLI with file and console output."""
-        import logging.handlers
-        from datetime import datetime
-        
-        # Create logs directory if it doesn't exist
+        # Use centralized setup with custom log file path
         logs_dir = os.path.join(os.path.dirname(__file__), '..', 'data', 'logs')
-        os.makedirs(logs_dir, exist_ok=True)
-        
-        # Create logger
-        logger = logging.getLogger('metadata_fill')
-        logger.setLevel(logging.DEBUG)
-        
-        # Remove any existing handlers to avoid duplicates
-        logger.handlers = []
-        
-        # File handler - write to data/logs/metadata_enrichment.log
         log_file = os.path.join(logs_dir, 'metadata_enrichment.log')
-        file_handler = logging.handlers.RotatingFileHandler(
-            log_file,
-            maxBytes=10*1024*1024,  # 10MB
-            backupCount=5
-        )
-        file_handler.setLevel(logging.DEBUG)
-        file_formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S'
-        )
-        file_handler.setFormatter(file_formatter)
         
-        # Console handler - INFO level for user-friendly output
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
-        console_formatter = logging.Formatter(
-            '%(levelname)s: %(message)s'
+        logger = setup_logger(
+            'metadata_fill',
+            log_file=log_file,
+            level=logging.DEBUG
         )
-        console_handler.setFormatter(console_formatter)
-        
-        # Add handlers to logger
-        logger.addHandler(file_handler)
-        logger.addHandler(console_handler)
-        
         return logger
 
     def run(self, args: argparse.Namespace) -> int:
@@ -769,9 +629,9 @@ def main():
     parser = create_cli_parser()
     args = parser.parse_args()
 
-    # Adjust logging level
-    if args.verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
+    # Setup logging
+    log_level = logging.DEBUG if args.verbose else logging.INFO
+    setup_logger(__name__, level=log_level)
 
     # Get whitelist option
     cli = MetadataFillCLI()

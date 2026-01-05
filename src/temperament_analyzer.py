@@ -61,6 +61,10 @@ from prompts import SYSTEM_PROMPT_TRACK, SYSTEM_PROMPT_PLAYLIST, get_track_class
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
+# Shared modules
+from models import Track, Playlist, Temperament, ClassificationResult
+from playlist_utils import PlaylistSelector, PlaylistWhitelistFilter
+from result_utils import ResultWriter, ResultSummary
 
 # ==================== CONFIGURATION ====================
 
@@ -77,120 +81,12 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# ==================== DATA MODELS ====================
-
-class Temperament(Enum):
-    """Four temperament categories"""
-    WOE = "Woe (Melancholic)"
-    FROLIC = "Frolic (Sanguine)"
-    DREAD = "Dread (Phlegmatic)"
-    MALICE = "Malice (Choleric)"
+# NOTE: Data models (Track, Playlist, Temperament, ClassificationResult)
+# are now defined in models.py and imported above
 
 
-@dataclass
-class Track:
-    """Represents a music track"""
-    track_id: str  # Persistent ID from Music.app
-    name: str
-    artist: str
-    album: Optional[str] = None
-    genre: Optional[str] = None
-    
-    def get_metadata_string(self) -> str:
-        """Return track metadata as a string for LLM analysis"""
-        parts = [f"Track: {self.name}", f"Artist: {self.artist}"]
-        if self.album:
-            parts.append(f"Album: {self.album}")
-        if self.genre:
-            parts.append(f"Genre: {self.genre}")
-        return " | ".join(parts)
-
-
-@dataclass
-class Playlist:
-    """Represents a music playlist"""
-    playlist_id: str  # Persistent ID from Music.app
-    name: str
-    tracks: List[Track]
-    folder_path: Optional[str] = None  # Path in Music.app folder structure
-    description: Optional[str] = None
-    
-    def get_metadata_string(self) -> str:
-        """Return playlist metadata as a string"""
-        parts = [f"Playlist: {self.name}"]
-        if self.folder_path:
-            parts.append(f"Folder: {self.folder_path}")
-        if self.description:
-            parts.append(f"Description: {self.description}")
-        return " | ".join(parts)
-
-
-@dataclass
-class ClassificationResult:
-    """Result of temperament classification"""
-    temperament: Temperament
-    confidence: float
-    reasoning: str
-
-
-# ==================== CLI UTILITIES ====================
-
-def select_playlists_interactive(playlists: List[Playlist]) -> List[Playlist]:
-    """Interactive CLI menu to select which playlists to analyze"""
-    if not playlists:
-        print("No playlists available.")
-        return []
-    
-    print("\n" + "="*60)
-    print("AVAILABLE PLAYLISTS")
-    print("="*60)
-    
-    # Display playlists with numbering
-    for idx, playlist in enumerate(playlists, 1):
-        track_count = len(playlist.tracks)
-        print(f"{idx:2d}. {playlist.name:40s} ({track_count:3d} tracks)")
-    
-    print("\n" + "-"*60)
-    print("Select playlists to analyze:")
-    print("  Enter numbers separated by commas (e.g., 1,3,5)")
-    print("  Or 'all' to analyze all playlists")
-    print("  Or 'q' to quit")
-    print("-"*60)
-    
-    while True:
-        try:
-            user_input = input("\nYour selection: ").strip().lower()
-            
-            # Handle quit
-            if user_input == 'q':
-                print("Cancelled.")
-                return []
-            
-            # Handle all playlists
-            if user_input == 'all':
-                print(f"\nSelected all {len(playlists)} playlists")
-                return playlists
-            
-            # Parse number selection
-            selected_indices = [int(x.strip()) - 1 for x in user_input.split(',')]
-            
-            # Validate indices
-            if any(idx < 0 or idx >= len(playlists) for idx in selected_indices):
-                print(f"Invalid selection. Please enter numbers between 1 and {len(playlists)}.")
-                continue
-            
-            # Get selected playlists
-            selected = [playlists[idx] for idx in selected_indices]
-            
-            print(f"\nSelected {len(selected)} playlist(s):")
-            for playlist in selected:
-                print(f"  - {playlist.name} ({len(playlist.tracks)} tracks)")
-            
-            return selected
-            
-        except ValueError:
-            print(f"Invalid input. Please enter numbers (1-{len(playlists)}) separated by commas, 'all', or 'q'.")
-            continue
+# NOTE: Interactive playlist selection is now in PlaylistSelector (playlist_utils.py)
+# Use PlaylistSelector.select_playlists_interactive() instead
 
 
 # ==================== ABSTRACT INTERFACES ====================
@@ -827,35 +723,12 @@ class TemperamentAnalyzer:
         return folders
     
     def _save_results(self):
-        """Save classification results to JSON file"""
-        output_file = 'temperament_analysis_results.json'
+        """Save classification results using shared utilities"""
+        writer = ResultWriter("data/logs", "temperament")
+        success = writer.save_results(self.results_log, "temperament_analysis_results.json")
         
-        try:
-            with open(output_file, 'w') as f:
-                json.dump(self.results_log, f, indent=2)
-            
-            logger.info(f"Results saved to {output_file}")
-            self._print_summary()
-            
-        except Exception as e:
-            logger.error(f"Failed to save results: {e}")
-    
-    def _print_summary(self):
-        """Print analysis summary"""
-        logger.info("\n" + "="*60)
-        logger.info("ANALYSIS SUMMARY")
-        logger.info("="*60)
-        
-        total = len(self.results_log)
-        
-        for temperament in Temperament:
-            count = sum(1 for r in self.results_log if r['temperament'] == temperament.value)
-            percentage = (count / total * 100) if total > 0 else 0
-            logger.info(f"{temperament.value}: {count} playlists ({percentage:.1f}%)")
-        
-        logger.info(f"\nTotal playlists analyzed: {total}")
-        logger.info(f"Unique tracks classified: {len(self.track_cache)}")
-        logger.info("="*60)
+        if success:
+            ResultSummary.print_temperament_summary(self.results_log)
 
 
 # ==================== MAIN FUNCTION ====================
@@ -917,7 +790,7 @@ def main():
             return 1
         
         # Let user select which playlists to analyze
-        selected_playlists = select_playlists_interactive(all_playlists)
+        selected_playlists = PlaylistSelector.select_playlists_interactive(all_playlists)
         
         if not selected_playlists:
             print("\nNo playlists selected. Exiting.")

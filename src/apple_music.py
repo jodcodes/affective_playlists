@@ -13,6 +13,9 @@ import subprocess
 import re
 from typing import List, Dict, Optional, Tuple
 import os
+from logger import setup_logger
+
+logger = setup_logger(__name__)
 
 
 class AppleMusicInterface:
@@ -392,3 +395,91 @@ end tell
 '''
         success, output = self._run_applescript(script)
         return output if success else None
+
+    def get_playlist_ids(self) -> Dict[str, str]:
+        """Get all user playlists with their persistent hex IDs.
+        
+        Extracts the persistent unique identifiers (16 hex digits) for each playlist,
+        which are used by Music.app and persist across sessions. Essential for
+        reliable playlist identification.
+        
+        Returns:
+            Dictionary mapping playlist names to their hex IDs
+            
+        Example:
+            {'My Playlist': 'A1B2C3D4E5F6G7H8', 'Favorites': 'F1E2D3C4B5A6G7H8'}
+        """
+        try:
+            script_path = os.path.join(self.scripts_dir, 'get_ids_playlists.applescript')
+            result = subprocess.run(
+                ['osascript', script_path],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if not result.stdout:
+                logger.error("Failed to get playlist IDs from AppleScript")
+                return {}
+            
+            return self._parse_playlist_ids(result.stdout)
+            
+        except subprocess.TimeoutExpired:
+            logger.error("AppleScript timeout while fetching playlist IDs")
+            return {}
+        except FileNotFoundError:
+            logger.error(f"AppleScript template not found: get_ids_playlists.applescript")
+            return {}
+        except Exception as e:
+            logger.error(f"Error getting playlist IDs: {e}")
+            return {}
+
+    @staticmethod
+    def _parse_playlist_ids(output: str) -> Dict[str, str]:
+        """Parse AppleScript output to extract playlist names and hex IDs.
+        
+        Args:
+            output: Raw AppleScript output containing name:VALUE and id:HEXID patterns
+            
+        Returns:
+            Dictionary mapping playlist names to hex IDs
+        """
+        playlists = {}
+        
+        # Find all hex IDs (16 hex digits - Music.app standard)
+        id_pattern = r'([A-F0-9]{16})'
+        id_matches = list(re.finditer(id_pattern, output, re.IGNORECASE))
+        
+        if not id_matches:
+            logger.warning("No playlist IDs found in AppleScript output")
+            return {}
+        
+        # For each ID found, work backward to find the corresponding name
+        for id_match in id_matches:
+            hex_id = id_match.group(1)
+            pos = id_match.start()
+            before_id = output[:pos]
+            
+            # Find the last "name:" label before this ID
+            # Match: name:VALUE where VALUE can have spaces, hyphens, numbers, letters
+            name_pattern = r'name:([^,]*?)(?:,\s*id:|$)'
+            name_matches = list(re.finditer(name_pattern, before_id))
+            
+            if name_matches:
+                # Get the last (most recent) name match
+                last_name_match = name_matches[-1]
+                name = last_name_match.group(1).strip()
+                
+                # Remove quotes if present
+                if (name.startswith("'") and name.endswith("'")) or \
+                   (name.startswith('"') and name.endswith('"')):
+                    name = name[1:-1]
+                
+                if name:  # Only add if we got a valid name
+                    playlists[name] = hex_id
+                    logger.debug(f"Found playlist: {name} -> {hex_id}")
+        
+        if not playlists:
+            logger.warning("No valid playlist name/ID pairs extracted from output")
+        
+        return playlists
