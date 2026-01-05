@@ -56,7 +56,6 @@ from dotenv import load_dotenv
 from tqdm import tqdm
 from track_metadata import TrackMetadataClient, SpotifyTrackMetadataClient, MusicBrainzTrackMetadataClient, MockTrackMetadataClient
 from prompts import SYSTEM_PROMPT_TRACK, SYSTEM_PROMPT_PLAYLIST, get_track_classification_prompt, get_playlist_classification_prompt, log_temperament_info
-from databases import log_database_info, get_recommended_provider, log_database_selection
 
 # Add project root to path for shared imports
 import sys
@@ -870,38 +869,32 @@ def main():
     # Log temperament definitions
     log_temperament_info()
     
-    # Log available databases
-    log_database_info()
-    
     required_vars = ['OPENAI_API_KEY']
     missing_vars = [var for var in required_vars if not os.getenv(var)]
     
     if missing_vars:
-        print("\nMissing required environment variables:")
+        logger.error("\nMissing required environment variables:")
         for var in missing_vars:
-            print(f"  - {var}")
-        print("\nCreate a .env file with:")
-        print("  OPENAI_API_KEY=your_openai_api_key")
+            logger.error(f"  - {var}")
+        logger.error("\nCreate a .env file with:")
+        logger.error("  OPENAI_API_KEY=your_openai_api_key")
         return 1
     
     try:
-        print("\nInitializing clients...")
+        logger.info("Initializing clients...")
         logger.info("Starting Music Playlist Temperament Analyzer")
         
         # Initialize metadata client (optional)
-        # Use recommended provider based on available credentials
-        recommended = get_recommended_provider()
-        log_database_selection(recommended)
-        
+        # Determine metadata provider based on available credentials
         metadata_client = None
-        if recommended == 'spotify':
-            print("Using Spotify for track metadata...")
+        if os.getenv('SPOTIFY_CLIENT_ID') and os.getenv('SPOTIFY_CLIENT_SECRET'):
+            logger.info("Using Spotify for track metadata")
             metadata_client = SpotifyTrackMetadataClient()
-        elif recommended == 'musicbrainz':
-            print("Using MusicBrainz for track metadata...")
+        elif True:  # MusicBrainz is always available
+            logger.info("Using MusicBrainz for track metadata")
             metadata_client = MusicBrainzTrackMetadataClient()
         else:
-            print("Using Mock database for track metadata (testing mode)...")
+            logger.info("Using Mock database for track metadata (testing mode)")
             metadata_client = MockTrackMetadataClient()
         
         # Initialize music library client

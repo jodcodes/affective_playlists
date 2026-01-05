@@ -10,7 +10,7 @@ Provides different LLM providers for music temperament classification:
 
 from temperament_analyzer import (
     LLMClient, Track, Playlist, ClassificationResult, 
-    Temperament, TemperamentAnalyzer
+    Temperament
 )
 from typing import List
 import random
@@ -156,7 +156,9 @@ Respond ONLY with JSON:
             )
             
         except Exception as e:
-            print(f"Claude API error: {e}")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Claude API error: {e}")
             return ClassificationResult(
                 temperament=Temperament.FROLIC,
                 confidence=0.1,
@@ -217,7 +219,9 @@ Respond ONLY with JSON:
             )
             
         except Exception as e:
-            print(f"Claude API error: {e}")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Claude API error: {e}")
             # Fallback to majority vote
             dominant = temperament_counts.most_common(1)[0][0] if temperament_counts else Temperament.FROLIC
             return ClassificationResult(
@@ -227,46 +231,4 @@ Respond ONLY with JSON:
             )
 
 
-def demo_mock_llm():
-    """Demonstrate using the mock LLM for testing"""
-    print("="*60)
-    print("Mock LLM Demo")
-    print("="*60)
-    
-    mock_llm = MockLLMClient()
-    
-    # Test tracks
-    test_tracks = [
-        Track("1", "Blue Monday", "New Order", "Power, Corruption & Lies"),
-        Track("2", "Happy", "Pharrell Williams", "GIRL", "Pop"),
-        Track("3", "Nightmare", "Avenged Sevenfold", "Nightmare", "Metal"),
-        Track("4", "Killing in the Name", "Rage Against the Machine", genre="Metal"),
-    ]
-    
-    print("\nClassifying individual tracks:")
-    for track in test_tracks:
-        result = mock_llm.classify_track(track)
-        print(f"\n  {track.name} by {track.artist}")
-        print(f"  → {result.temperament.value} (confidence: {result.confidence:.2f})")
-        print(f"  Reasoning: {result.reasoning[:80]}...")
-    
-    # Test playlist
-    playlist = Playlist(
-        id="pl.test",
-        name="Dark Vibes",
-        tracks=test_tracks,
-        description="Moody playlist"
-    )
-    
-    track_classifications = [mock_llm.classify_track(t) for t in test_tracks]
-    playlist_result = mock_llm.classify_playlist(playlist, track_classifications)
-    
-    print(f"\n\nPlaylist Classification:")
-    print(f"  {playlist.name}")
-    print(f"  → {playlist_result.temperament.value} (confidence: {playlist_result.confidence:.2f})")
-    print(f"  Reasoning: {playlist_result.reasoning}")
-    print("\n" + "="*60)
 
-
-if __name__ == "__main__":
-    demo_mock_llm()

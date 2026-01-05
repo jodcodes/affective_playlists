@@ -245,7 +245,7 @@ class MetadataFiller:
             Dictionary with results
         """
         # Get playlist ID
-        print(f"\nLoading playlist: {playlist_name}...")
+        self.logger.info(f"Loading playlist: {playlist_name}")
         playlist_ids = self._get_playlist_ids()
         
         # Try exact match first
@@ -351,7 +351,7 @@ class MetadataFiller:
         Returns:
             Dictionary with results
         """
-        print(f"\nLoading folder: {folder_name}...")
+        self.logger.info(f"Loading folder: {folder_name}")
         
         # Resolve folder path
         folder_path = self._resolve_folder_path(folder_name)

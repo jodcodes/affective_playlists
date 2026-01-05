@@ -95,7 +95,7 @@ def test_shared_modules():
     except Exception as e:
         results.add("TextNormalizer.normalize()", False, str(e))
     
-    return results.summary()
+    assert results.summary(), f"Test failures: {results.errors}"
 
 
 def test_4tempers():
@@ -123,7 +123,7 @@ def test_4tempers():
     except Exception as e:
         results.add("4tempers config.json loads", False, str(e))
     
-    return results.summary()
+    assert results.summary(), f"Test failures: {results.errors}"
 
 
 def test_metad_enr():
@@ -158,7 +158,7 @@ def test_metad_enr():
     except Exception as e:
         results.add("metad_enr config.json loads", False, str(e))
     
-    return results.summary()
+    assert results.summary(), f"Test failures: {results.errors}"
 
 
 def test_plsort():
@@ -211,7 +211,7 @@ def test_plsort():
     except Exception as e:
         results.add("plsort config.json loads", False, str(e))
     
-    return results.summary()
+    assert results.summary(), f"Test failures: {results.errors}"
 
 
 def test_cli():
@@ -246,7 +246,7 @@ def test_cli():
     except Exception as e:
         results.add("main.py --list", False, str(e))
     
-    return results.summary()
+    assert results.summary(), f"Test failures: {results.errors}"
 
 
 def test_configuration():
@@ -288,7 +288,7 @@ def test_configuration():
     except Exception as e:
         results.add(f"Centralized whitelist.json is valid", False, str(e))
     
-    return results.summary()
+    assert results.summary(), f"Test failures: {results.errors}"
 
 
 def test_imports_from_shared():
@@ -309,7 +309,7 @@ def test_imports_from_shared():
     except Exception as e:
         results.add("Shared AppleMusicInterface available", False, str(e))
     
-    return results.summary()
+    assert results.summary(), f"Test failures: {results.errors}"
 
 
 def main():

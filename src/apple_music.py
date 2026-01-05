@@ -10,7 +10,6 @@ This interface just returns all playlists; the caller decides which to process.
 """
 
 import subprocess
-import json
 import re
 from typing import List, Dict, Optional, Tuple
 import os

@@ -33,7 +33,7 @@ def print_section(title):
     print(f"{BLUE}{'='*70}{NC}\n")
 
 
-def print_test_result(name, passed, details=""):
+def print_check_result(name, passed, details=""):
     """Print test result (helper function, not a test)."""
     status = f"{GREEN}✓ PASS{NC}" if passed else f"{RED}✗ FAIL{NC}"
     print(f"  {status} - {name}")
@@ -41,7 +41,7 @@ def print_test_result(name, passed, details=""):
         print(f"         {details}")
 
 
-def test_directory_structure():
+def check_directory_structure():
     """Test that all required directories exist."""
     print_section("Testing Directory Structure")
     
@@ -57,13 +57,14 @@ def test_directory_structure():
     for dir_name, description in required_dirs:
         dir_path = PROJECT_ROOT / dir_name
         exists = dir_path.exists() and dir_path.is_dir()
-        print_test_result(description, exists, f"{dir_path}")
+        print_check_result(description, exists, f"{dir_path}")
         all_passed = all_passed and exists
     
+    assert all_passed
     return all_passed
 
 
-def test_shared_files():
+def check_shared_files():
     """Test that shared module files exist."""
     print_section("Testing Shared Module Files")
     
@@ -78,13 +79,14 @@ def test_shared_files():
     for file_path, description in required_files:
         full_path = PROJECT_ROOT / file_path
         exists = full_path.exists() and full_path.is_file()
-        print_test_result(description, exists, file_path)
+        print_check_result(description, exists, file_path)
         all_passed = all_passed and exists
     
+    assert all_passed
     return all_passed
 
 
-def test_root_files():
+def check_root_files():
     """Test that root config files exist."""
     print_section("Testing Root Configuration Files")
     
@@ -105,13 +107,14 @@ def test_root_files():
     for file_path, description in required_files:
         full_path = PROJECT_ROOT / file_path
         exists = full_path.exists() and full_path.is_file()
-        print_test_result(description, exists, file_path)
+        print_check_result(description, exists, file_path)
         all_passed = all_passed and exists
     
+    assert all_passed
     return all_passed
 
 
-def test_shared_imports():
+def check_shared_imports():
     """Test that shared modules can be imported."""
     print_section("Testing Shared Module Imports")
     
@@ -120,39 +123,40 @@ def test_shared_imports():
     # Test importing from shared package
     try:
         from shared import AppleMusicInterface, TextNormalizer, setup_logger
-        print_test_result("Import from shared package", True)
+        print_check_result("Import from shared package", True)
     except ImportError as e:
-        print_test_result("Import from shared package", False, str(e))
+        print_check_result("Import from shared package", False, str(e))
         all_passed = False
     
     # Test importing AppleMusicInterface
     try:
         from shared.apple_music import AppleMusicInterface
-        print_test_result("Import AppleMusicInterface", True)
+        print_check_result("Import AppleMusicInterface", True)
     except ImportError as e:
-        print_test_result("Import AppleMusicInterface", False, str(e))
+        print_check_result("Import AppleMusicInterface", False, str(e))
         all_passed = False
     
     # Test importing TextNormalizer
     try:
         from shared.normalizer import TextNormalizer
-        print_test_result("Import TextNormalizer", True)
+        print_check_result("Import TextNormalizer", True)
     except ImportError as e:
-        print_test_result("Import TextNormalizer", False, str(e))
+        print_check_result("Import TextNormalizer", False, str(e))
         all_passed = False
     
     # Test importing setup_logger
     try:
         from shared.logger import setup_logger
-        print_test_result("Import setup_logger", True)
+        print_check_result("Import setup_logger", True)
     except ImportError as e:
-        print_test_result("Import setup_logger", False, str(e))
+        print_check_result("Import setup_logger", False, str(e))
         all_passed = False
     
+    assert all_passed
     return all_passed
 
 
-def test_shared_functionality():
+def check_shared_functionality():
     """Test that shared modules work correctly."""
     print_section("Testing Shared Module Functionality")
     
@@ -164,10 +168,10 @@ def test_shared_functionality():
         normalizer = TextNormalizer()
         result = normalizer.normalize("  HELLO & World!  ")
         passed = result == "hello and world"
-        print_test_result("TextNormalizer.normalize()", passed, f"Got: '{result}'")
+        print_check_result("TextNormalizer.normalize()", passed, f"Got: '{result}'")
         all_passed = all_passed and passed
     except Exception as e:
-        print_test_result("TextNormalizer.normalize()", False, str(e))
+        print_check_result("TextNormalizer.normalize()", False, str(e))
         all_passed = False
     
     # Test TextNormalizer list normalization
@@ -176,10 +180,10 @@ def test_shared_functionality():
         normalizer = TextNormalizer()
         result = normalizer.normalize_list(["  text1  ", "  text2  ", "  text1  "])
         passed = result == ["text1", "text2"] and len(result) == 2
-        print_test_result("TextNormalizer.normalize_list()", passed, f"Got: {result}")
+        print_check_result("TextNormalizer.normalize_list()", passed, f"Got: {result}")
         all_passed = all_passed and passed
     except Exception as e:
-        print_test_result("TextNormalizer.normalize_list()", False, str(e))
+        print_check_result("TextNormalizer.normalize_list()", False, str(e))
         all_passed = False
     
     # Test logger setup
@@ -187,9 +191,9 @@ def test_shared_functionality():
         from shared.logger import setup_logger
         logger = setup_logger("test")
         logger.info("Test message")
-        print_test_result("setup_logger()", True)
+        print_check_result("setup_logger()", True)
     except Exception as e:
-        print_test_result("setup_logger()", False, str(e))
+        print_check_result("setup_logger()", False, str(e))
         all_passed = False
     
     # Test AppleMusicInterface instantiation
@@ -198,15 +202,16 @@ def test_shared_functionality():
         from shared.apple_music import AppleMusicInterface
         shared_scripts = os.path.join(os.path.dirname(__file__), '..', 'shared', 'scripts')
         ami = AppleMusicInterface(scripts_dir=shared_scripts)
-        print_test_result("AppleMusicInterface instantiation", True)
+        print_check_result("AppleMusicInterface instantiation", True)
     except Exception as e:
-        print_test_result("AppleMusicInterface instantiation", False, str(e))
+        print_check_result("AppleMusicInterface instantiation", False, str(e))
         all_passed = False
     
+    assert all_passed
     return all_passed
 
 
-def test_backwards_compatibility():
+def check_backwards_compatibility():
     """Test that old imports still work."""
     print_section("Testing Backwards Compatibility")
     
@@ -215,23 +220,24 @@ def test_backwards_compatibility():
     # Test src.apple_music import (now in src/)
     try:
         from apple_music import AppleMusicInterface
-        print_test_result("src.apple_music import", True)
+        print_check_result("src.apple_music import", True)
     except ImportError as e:
-        print_test_result("src.apple_music import", False, str(e))
+        print_check_result("src.apple_music import", False, str(e))
         all_passed = False
     
     # Test src.normalizer import (now in src/)
     try:
         from normalizer import TextNormalizer
-        print_test_result("src.normalizer import", True)
+        print_check_result("src.normalizer import", True)
     except ImportError as e:
-        print_test_result("src.normalizer import", False, str(e))
+        print_check_result("src.normalizer import", False, str(e))
         all_passed = False
     
+    assert all_passed
     return all_passed
 
 
-def test_syntax():
+def check_syntax():
     """Test Python syntax of key files."""
     print_section("Testing Python Syntax")
     
@@ -251,18 +257,19 @@ def test_syntax():
             full_path = PROJECT_ROOT / file_path
             if full_path.exists():
                 py_compile.compile(str(full_path), doraise=True)
-                print_test_result(f"Syntax check: {file_path}", True)
+                print_check_result(f"Syntax check: {file_path}", True)
             else:
-                print_test_result(f"Syntax check: {file_path}", False, "File not found")
+                print_check_result(f"Syntax check: {file_path}", False, "File not found")
                 all_passed = False
         except py_compile.PyCompileError as e:
-            print_test_result(f"Syntax check: {file_path}", False, str(e))
+            print_check_result(f"Syntax check: {file_path}", False, str(e))
             all_passed = False
     
+    assert all_passed
     return all_passed
 
 
-def test_main_cli():
+def check_main_cli():
     """Test main.py CLI."""
     print_section("Testing Main CLI")
     
@@ -278,10 +285,10 @@ def test_main_cli():
             timeout=5
         )
         passed = result.returncode == 0
-        print_test_result("main.py --help", passed, f"Return code: {result.returncode}")
+        print_check_result("main.py --help", passed, f"Return code: {result.returncode}")
         all_passed = all_passed and passed
     except Exception as e:
-        print_test_result("main.py --help", False, str(e))
+        print_check_result("main.py --help", False, str(e))
         all_passed = False
     
     # Test --list
@@ -294,12 +301,13 @@ def test_main_cli():
             timeout=5
         )
         passed = result.returncode == 0 and '4tempers' in result.stdout
-        print_test_result("main.py --list", passed, f"Return code: {result.returncode}")
+        print_check_result("main.py --list", passed, f"Return code: {result.returncode}")
         all_passed = all_passed and passed
     except Exception as e:
-        print_test_result("main.py --list", False, str(e))
+        print_check_result("main.py --list", False, str(e))
         all_passed = False
     
+    assert all_passed
     return all_passed
 
 
@@ -313,14 +321,14 @@ def main():
     print(f"{NC}")
     
     results = {
-        'Directory Structure': test_directory_structure(),
-        'Shared Module Files': test_shared_files(),
-        'Root Configuration Files': test_root_files(),
-        'Shared Module Imports': test_shared_imports(),
-        'Shared Module Functionality': test_shared_functionality(),
-        'Backwards Compatibility': test_backwards_compatibility(),
-        'Python Syntax': test_syntax(),
-        'Main CLI': test_main_cli(),
+        'Directory Structure': check_directory_structure(),
+        'Shared Module Files': check_shared_files(),
+        'Root Configuration Files': check_root_files(),
+        'Shared Module Imports': check_shared_imports(),
+        'Shared Module Functionality': check_shared_functionality(),
+        'Backwards Compatibility': check_backwards_compatibility(),
+        'Python Syntax': check_syntax(),
+        'Main CLI': check_main_cli(),
     }
     
     # Print summary
