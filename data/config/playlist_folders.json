@@ -6,11 +6,17 @@
     "malice": "Malice (Choleric)"
   },
   "genre_folders": {
+    "pop": "Pop",
+    "rock": "Rock",
     "hiphop": "Hip-Hop",
     "electronic": "Electronic",
-    "disco_funk_soul": "Disco/Funk/Soul",
-    "jazz": "Jazz",
+    "country": "Country",
     "world": "World",
-    "rock": "Rock"
+    "jazz": "Jazz",
+    "disco_funk_soul": "Disco/Funk/Soul",
+    "classical": "Classical",
+    "ambient": "Ambient",
+    "soundtrack": "Soundtrack",
+    "other": "Other"
   }
 }
