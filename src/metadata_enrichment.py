@@ -29,7 +29,8 @@ Key Classes:
 import json
 import logging
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
@@ -85,7 +86,7 @@ class MetadataEntry:
     value: str
     source: DatabaseSource
     confidence: float = 1.0  # 0.0-1.0: exact match=1.0, partial=0.5-0.8
-    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())  # type: ignore[misc]
+    timestamp: str = dataclass_field(default_factory=lambda: datetime.now().isoformat())  # type: ignore[misc]
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -103,9 +104,9 @@ class EnrichedMetadata:
 
     track_id: TrackIdentifier
     filepath: str
-    entries: Dict[MetadataField, MetadataEntry] = field(default_factory=dict)
-    existing_metadata: Dict[str, str] = field(default_factory=dict)
-    skipped_fields: Dict[MetadataField, str] = field(default_factory=dict)
+    entries: Dict[MetadataField, MetadataEntry] = dataclass_field(default_factory=dict)
+    existing_metadata: Dict[str, str] = dataclass_field(default_factory=dict)
+    skipped_fields: Dict[MetadataField, str] = dataclass_field(default_factory=dict)
 
     def add_entry(self, entry: MetadataEntry) -> None:
         """Add a metadata entry, keeping highest confidence version."""

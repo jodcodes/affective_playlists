@@ -148,7 +148,7 @@ def health():
 
         if pm and hasattr(pm, "get_all_playlists"):
             try:
-                playlists = pm.get_all_playlists()
+                playlists = pm.get_all_playlists()  # pylint: disable=no-member
             except Exception:
                 pass
 
@@ -275,7 +275,7 @@ def get_playlist_details(playlist_id: str):
 
         if pm and hasattr(pm, "get_playlist_details"):
             try:
-                details = pm.get_playlist_details(playlist_id)
+                details = pm.get_playlist_details(playlist_id)  # pylint: disable=no-member
                 if details:
                     return jsonify(details)
             except Exception:
@@ -320,15 +320,15 @@ def classify_playlist(playlist_id: str):
         if classifier and pm:
             try:
                 # In real implementation, would get tracks and classify
-                result = classifier.classify_playlist(playlist_id)
-                if result:
+                genre, classification_details = classifier.classify_playlist([], playlist_id)
+                if genre or classification_details:
                     return jsonify(
                         {
                             "id": playlist_id,
-                            "genre": result.get("genre", "unclassified"),
-                            "confidence": result.get("confidence", 0.0),
-                            "reasoning": result.get("reasoning", ""),
-                            "success": result.get("success", False),
+                            "genre": genre or "unclassified",
+                            "confidence": classification_details.get("confidence", 0.0),
+                            "reasoning": classification_details.get("reasoning", ""),
+                            "success": bool(genre),
                         }
                     )
             except Exception as e:

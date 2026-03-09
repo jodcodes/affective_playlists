@@ -422,7 +422,7 @@ class WikidataQuery(DatabaseQuery):
         self.logger.debug(f"Found Wikidata entity: {entity}")
 
         # Query entity for metadata
-        metadata = self._get_entity_metadata(entity)
+        metadata = self._get_entity_metadata(entity)  # pylint: disable=assignment-from-none
         if not metadata:
             return results
 
