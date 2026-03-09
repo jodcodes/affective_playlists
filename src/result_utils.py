@@ -153,7 +153,7 @@ class ResultSummary:
         print("=" * 60)
 
         # Count by temperament
-        temperament_counts = {}
+        temperament_counts: Dict[str, int] = {}
         total_confidence = 0.0
 
         for result in results:

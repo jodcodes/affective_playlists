@@ -276,9 +276,7 @@ def check_job_quota():
                 response.status_code = 429
                 return response
 
-            # Add quota info to kwargs for endpoint to use
-            kwargs["_quota_info"] = quota_info
-
+            # Call the function (don't pass quota_info as it may not be expected)
             result = f(*args, **kwargs)
             return result
 

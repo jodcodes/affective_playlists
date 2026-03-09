@@ -360,7 +360,7 @@ class Table:
     def __init__(self, headers: List[str], title: Optional[str] = None):
         """Initialize table."""
         self.headers = headers
-        self.rows = []
+        self.rows: List[tuple] = []
         self.title = title
 
     def add_row(self, *values) -> None:

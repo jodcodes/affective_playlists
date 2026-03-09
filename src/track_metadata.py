@@ -8,7 +8,7 @@ Supports multiple providers: Spotify, MusicBrainz, etc.
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Any, Dict, Optional, cast
 
 import requests
 
@@ -151,7 +151,7 @@ class MusicBrainzTrackMetadataClient(TrackMetadataClient):
             response = requests.get(
                 f"{self.base_url}/recording",
                 headers=self.headers,
-                params={"query": search_query, "limit": 1, "fmt": "json"},
+                params={"query": search_query, "limit": 1, "fmt": "json"},  # type: ignore[arg-type]
             )
             response.raise_for_status()
 

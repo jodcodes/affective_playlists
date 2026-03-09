@@ -32,7 +32,7 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 
 class MetadataField(Enum):
@@ -85,9 +85,9 @@ class MetadataEntry:
     value: str
     source: DatabaseSource
     confidence: float = 1.0  # 0.0-1.0: exact match=1.0, partial=0.5-0.8
-    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())  # type: ignore[misc]
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> Dict[str, Any]:
         return {
             "field": self.field.value,
             "value": self.value,

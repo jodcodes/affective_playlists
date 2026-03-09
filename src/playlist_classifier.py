@@ -5,7 +5,7 @@ import os
 import re
 from collections import Counter, defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 from src.logger import setup_logger
 from src.metadata_enrichment import MetadataField
@@ -68,11 +68,11 @@ class PlaylistClassifier:
         self.target_genres = list(self.artist_lists.keys())
         logger.info(f"Initialized classifier for genres: {self.target_genres}")
 
-    def load_json(self, path: str) -> Dict:
+    def load_json(self, path: str) -> Dict[str, Any]:
         """Load JSON configuration files."""
         try:
             with open(path, "r", encoding="utf-8") as file:
-                return json.load(file)
+                return cast(Dict[str, Any], json.load(file))
         except Exception as e:
             logger.error(f"Failed to load JSON from {path}: {e}")
             return {}
@@ -151,7 +151,7 @@ class PlaylistClassifier:
         # Skip if track already has genre
         existing_genre = track.get("genre")
         if existing_genre and isinstance(existing_genre, str) and existing_genre.strip():
-            return existing_genre.strip()
+            return cast(str, existing_genre.strip())
 
         # Extract artist and title
         artist = track.get("artist", "").strip()
@@ -198,7 +198,7 @@ class PlaylistClassifier:
 
         # Direct mapping check
         if raw_genre_norm in self.genre_map:
-            return self.genre_map[raw_genre_norm]
+            return cast(str, self.genre_map[raw_genre_norm])
 
         # Keyword-based mapping
         genre_keywords = {
@@ -257,7 +257,7 @@ class PlaylistClassifier:
 
         for target_genre, keywords in genre_keywords.items():
             if any(keyword in raw_genre_norm for keyword in keywords):
-                return target_genre
+                return cast(str, target_genre)
 
         return None
 
@@ -337,7 +337,7 @@ class PlaylistClassifier:
         if not tracks:
             return {}
 
-        playlist_scores = defaultdict(float)
+        playlist_scores: defaultdict[str, float] = defaultdict(float)
         track_count = len(tracks)
 
         logger.debug(f"Scoring playlist with {track_count} tracks")
@@ -463,7 +463,7 @@ class PlaylistClassifier:
 
                 max_tfidf_score = max(tfidf_scores.values())
                 if max_tfidf_score > 0:
-                    dominant_genre = max(tfidf_scores, key=tfidf_scores.get)
+                    dominant_genre = max(tfidf_scores, key=lambda x: tfidf_scores[x])
                     decision_info["confidence"] = max_tfidf_score
                     decision_info["reason"] = f"TF-IDF fallback selected {dominant_genre}"
                     return dominant_genre, decision_info
@@ -478,7 +478,7 @@ class PlaylistClassifier:
         decision_info["confidence"] = dominance_ratio
 
         if dominance_ratio >= self.dominance_threshold:
-            dominant_genre = max(playlist_scores, key=playlist_scores.get)
+            dominant_genre = max(playlist_scores, key=lambda x: playlist_scores[x])
             decision_info["reason"] = f"Clear dominance: {dominant_genre} ({dominance_ratio:.2f})"
             return dominant_genre, decision_info
         else:

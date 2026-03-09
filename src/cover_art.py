@@ -84,7 +84,7 @@ class CoverArtDownloader:
             with urllib.request.urlopen(
                 req, timeout=self.timeout, context=_SSL_CONTEXT
             ) as response:
-                data = response.read()
+                data: bytes = response.read()
                 if len(data) > self.max_image_size:
                     self.logger.warning(
                         f"Image too large: {len(data)} bytes, max {self.max_image_size}"

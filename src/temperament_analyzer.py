@@ -52,7 +52,7 @@ from abc import ABC, abstractmethod
 from collections import Counter
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 import requests
 from dotenv import load_dotenv
@@ -172,7 +172,7 @@ class MusicAppClient(MusicLibraryClient):
             logger.warning("Could not import shared.config")
             return False, set()
 
-    def _load_playlist_folders_config(self) -> dict:
+    def _load_playlist_folders_config(self) -> Dict[str, Any]:
         """Load playlist folders config from data/config/ directory"""
         try:
             import json
@@ -181,7 +181,7 @@ class MusicAppClient(MusicLibraryClient):
                 os.path.dirname(__file__), "..", "data", "config", "playlist_folders.json"
             )
             with open(config_path, "r") as f:
-                return json.load(f)
+                return cast(Dict[str, Any], json.load(f))
         except Exception as e:
             logger.warning(f"Could not load playlist folders config: {e}")
             return {}
@@ -202,7 +202,7 @@ class MusicAppClient(MusicLibraryClient):
 
         return False
 
-    def _get_playlist_ids(self) -> dict:
+    def _get_playlist_ids(self) -> Dict[str, str]:
         """Get all user playlists with their persistent IDs"""
         if self._playlist_ids_cache is not None:
             return self._playlist_ids_cache
@@ -218,9 +218,9 @@ class MusicAppClient(MusicLibraryClient):
             # Parse output: name:PlaylistName, id:HEXid, name:...
             import re
 
-            playlists = {}
+            playlists: Dict[str, str] = {}
             # Match both with and without quotes around names
-            matches = re.findall(r"name:([^,]+),\s*id:([A-F0-9]+)", result)
+            matches: List[Tuple[str, str]] = re.findall(r"name:([^,]+),\s*id:([A-F0-9]+)", result)  # type: ignore[assignment]
 
             for name, pid in matches:
                 # Clean up name (remove quotes if present)
@@ -230,7 +230,7 @@ class MusicAppClient(MusicLibraryClient):
 
             logger.debug(f"Parsed {len(playlists)} playlists from AppleScript output")
             self._playlist_ids_cache = playlists
-            return playlists
+            return playlists  # type: ignore[return-value]
 
         except Exception as e:
             logger.error(f"Error getting playlist IDs: {e}")
@@ -410,15 +410,16 @@ end tell
 
             if folder_id:
                 logger.info(f"Created folder: {folder_name} (ID: {folder_id})")
-                return folder_id
+                return cast(str, folder_id)
             else:
                 logger.error(f"Failed to create folder: {folder_name}")
-                return None
+                # Fallback: return mock ID or raise error
+                return ""
 
         except Exception as e:
             logger.warning(f"Could not create folder via AppleScript: {e}")
             # Fallback: return mock ID
-            return f"folder_{folder_name.lower().replace(' ', '_')}"
+            return cast(str, f"folder_{folder_name.lower().replace(' ', '_')}")
 
     def move_playlist_to_folder(self, playlist_id: str, folder_id: str) -> bool:
         """Move a playlist to a folder using persistent IDs"""

@@ -773,13 +773,19 @@ def save_settings():
         return jsonify({"error": str(e)}), 500
 
 
-@app.before_first_request
-def before_first_request():
-    """Initialize app on first request."""
-    try:
-        setup_database()
-    except Exception as e:
-        logger.warning(f"Database initialization skipped: {e}")
+@app.before_request
+def before_request_handler():
+    """Initialize database on first request."""
+    def init():
+        try:
+            if not hasattr(app, "_db_initialized"):
+                setup_database()
+                app._db_initialized = True
+        except Exception as e:
+            logger.warning(f"Database initialization skipped: {e}")
+    
+    # Only run once
+    init()
 
 
 @app.errorhandler(404)

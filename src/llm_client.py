@@ -11,7 +11,7 @@ Provides different LLM providers for music temperament classification:
 import random
 from typing import List
 
-from temperament_analyzer import ClassificationResult, LLMClient, Playlist, Temperament, Track
+from src.temperament_analyzer import ClassificationResult, LLMClient, Playlist, Temperament, Track
 
 
 class MockLLMClient(LLMClient):
@@ -70,7 +70,7 @@ class MockLLMClient(LLMClient):
 
         # Find best match
         if max(scores.values()) > 0:
-            best_temperament = max(scores, key=scores.get)
+            best_temperament = max(scores, key=lambda x: scores[x])
             confidence = min(0.9, scores[best_temperament] * 0.3 + 0.5)  # Scale confidence
         else:
             # Default to random if no keywords match

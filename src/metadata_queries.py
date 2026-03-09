@@ -41,7 +41,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 from src.metadata_enrichment import DatabaseSource, MetadataEntry, MetadataField
 
@@ -103,7 +103,7 @@ class DatabaseQuery(ABC):
             req = urllib.request.Request(url, headers=headers)
             # Use explicit SSL context to ensure certificates work
             with urllib.request.urlopen(req, timeout=timeout, context=_SSL_CONTEXT) as response:
-                return response.read().decode("utf-8")
+                return cast(bytes, response.read()).decode("utf-8")
         except urllib.error.URLError as e:
             self.logger.debug(f"URL fetch failed: {e}")
             return None
@@ -125,7 +125,7 @@ class MusicBrainzQuery(DatabaseQuery):
 
         Returns: {field: (value, confidence), ...}
         """
-        results = {}
+        results: Dict[MetadataField, Tuple[str, float]] = {}
 
         # Search for recording by artist and title
         recording = self._search_recording(artist, title)
@@ -166,11 +166,11 @@ class MusicBrainzQuery(DatabaseQuery):
             return None
 
         try:
-            data = json.loads(response)
+            data = cast(Dict[str, Any], json.loads(response))
             recordings = data.get("recordings", [])
 
             if recordings:
-                return recordings[0]
+                return cast(Optional[Dict[str, Any]], recordings[0])
         except json.JSONDecodeError:
             pass
 
@@ -217,7 +217,7 @@ class AcousticBrainzQuery(DatabaseQuery):
 
         Returns: {field: (value, confidence), ...}
         """
-        results = {}
+        results: Dict[MetadataField, Tuple[str, float]] = {}
 
         # Step 1: Get MBID from MusicBrainz
         mbid = self._get_mbid(artist, title)
@@ -253,10 +253,10 @@ class AcousticBrainzQuery(DatabaseQuery):
             return None
 
         try:
-            data = json.loads(response)
+            data = cast(Dict[str, Any], json.loads(response))
             recordings = data.get("recordings", [])
             if recordings:
-                return recordings[0].get("id")
+                return cast(Optional[str], recordings[0].get("id"))
         except (json.JSONDecodeError, KeyError, IndexError):
             pass
 
@@ -279,7 +279,7 @@ class AcousticBrainzQuery(DatabaseQuery):
             return None
 
         try:
-            return json.loads(response)
+            return cast(Dict[str, Any], json.loads(response))
         except json.JSONDecodeError:
             return None
 
@@ -321,7 +321,7 @@ class DiscogsQuery(DatabaseQuery):
 
         Returns: {field: (value, confidence), ...}
         """
-        results = {}
+        results: Dict[MetadataField, Tuple[str, float]] = {}
 
         if not self.token:
             self.logger.debug("Discogs token not provided, skipping Discogs query")
@@ -336,7 +336,8 @@ class DiscogsQuery(DatabaseQuery):
         self.logger.debug(f"Found Discogs release: {release.get('id')}")
 
         # Step 2: Get detailed release info
-        release_detail = self._get_release_detail(release.get("id"))
+        release_id = cast(Optional[int], release.get("id"))
+        release_detail = self._get_release_detail(release_id) if release_id else None
         if not release_detail:
             self.logger.debug(f"Could not fetch Discogs release details")
             return results
@@ -371,18 +372,18 @@ class DiscogsQuery(DatabaseQuery):
             return None
 
         try:
-            data = json.loads(response)
+            data = cast(Dict[str, Any], json.loads(response))
             results = data.get("results", [])
 
             if results:
                 # Return first release result
-                return results[0]
+                return cast(Dict[str, Any], results[0])
         except (json.JSONDecodeError, KeyError, IndexError):
             pass
 
         return None
 
-    def _get_release_detail(self, release_id: int) -> Optional[dict]:
+    def _get_release_detail(self, release_id: int) -> Optional[Dict[str, Any]]:
         """Get detailed information about a Discogs release."""
         params = urllib.parse.urlencode({"token": self.token})
         url = f"{self.BASE_URL}/releases/{release_id}?{params}"
@@ -393,7 +394,7 @@ class DiscogsQuery(DatabaseQuery):
             return None
 
         try:
-            return json.loads(response)
+            return cast(Dict[str, Any], json.loads(response))
         except json.JSONDecodeError:
             return None
 
@@ -411,7 +412,7 @@ class WikidataQuery(DatabaseQuery):
 
         Returns: {field: (value, confidence), ...}
         """
-        results = {}
+        results: Dict[MetadataField, Tuple[str, float]] = {}
 
         # Search for musical work/song
         entity = self._search_entity(title)
@@ -454,16 +455,16 @@ class WikidataQuery(DatabaseQuery):
             return None
 
         try:
-            data = json.loads(response)
+            data = cast(Dict[str, Any], json.loads(response))
             search_results = data.get("query", {}).get("search", [])
             if search_results:
-                return search_results[0]["title"]
+                return cast(Optional[str], search_results[0]["title"])
         except (json.JSONDecodeError, KeyError):
             pass
 
         return None
 
-    def _get_entity_metadata(self, entity_title: str) -> Optional[dict]:
+    def _get_entity_metadata(self, entity_title: str) -> Optional[Dict[str, Any]]:
         """Get metadata for entity."""
         # Simplified - would query entity properties
         return None
@@ -492,7 +493,7 @@ class LastfmQuery(DatabaseQuery):
             self.logger.debug("Last.fm API key not provided")
             return {}
 
-        results = {}
+        results: Dict[MetadataField, Tuple[str, float]] = {}
 
         # Query track info
         track_info = self._get_track_info(artist, title)
@@ -508,7 +509,7 @@ class LastfmQuery(DatabaseQuery):
 
         return results
 
-    def _get_track_info(self, artist: str, title: str) -> Optional[dict]:
+    def _get_track_info(self, artist: str, title: str) -> Optional[Dict[str, Any]]:
         """Get track info from Last.fm."""
         params = urllib.parse.urlencode(
             {
@@ -527,8 +528,9 @@ class LastfmQuery(DatabaseQuery):
             return None
 
         try:
-            data = json.loads(response)
-            return data.get("track")
+            data = cast(Dict[str, Any], json.loads(response))
+            # data.get("track") returns the track info dict
+            return cast(Optional[Dict[str, Any]], data.get("track"))
         except json.JSONDecodeError:
             pass
 
@@ -650,8 +652,10 @@ class MetadataQueryOrchestrator:
                             f"  ✓ Found {field.name} from {source.name}: {value} (conf: {confidence})"
                         )
                     elif field in found_fields:
+                        source_field = self._get_field_source(entries, field)
+                        source_name = source_field.name if source_field else "unknown"
                         self.logger.debug(
-                            f"  ✗ Skipping {field.name} from {source.name} (already have from {self._get_field_source(entries, field).name})"
+                            f"  ✗ Skipping {field.name} from {source.name} (already have from {source_name})"
                         )
                     else:
                         self.logger.debug(

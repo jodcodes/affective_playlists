@@ -29,7 +29,7 @@ import logging
 import os
 import sys
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from tqdm import tqdm
 
@@ -113,7 +113,7 @@ class MetadataFiller:
         except ImportError:
             return False, set()
 
-    def _load_playlist_folders_config(self) -> dict:
+    def _load_playlist_folders_config(self) -> Dict[str, Any]:
         """Load playlist folders config from data directory"""
         try:
             import json
@@ -122,7 +122,7 @@ class MetadataFiller:
                 os.path.dirname(__file__), "..", "data", "config", "playlist_folders.json"
             )
             with open(config_path, "r") as f:
-                return json.load(f)
+                return cast(Dict[str, Any], json.load(f))
         except Exception as e:
             self.logger.warning(f"Could not load playlist folders config: {e}")
             return {}

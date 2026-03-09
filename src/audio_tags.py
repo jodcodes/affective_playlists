@@ -63,7 +63,7 @@ class MP3TagHandler(AudioTagHandler):
 
         Returns: {field: value} dict
         """
-        tags = {}
+        tags: Dict[str, str] = {}
 
         try:
             with open(self.filepath, "rb") as f:
@@ -167,7 +167,7 @@ class FLACTagHandler(AudioTagHandler):
 
         Returns: {field: value} dict
         """
-        tags = {}
+        tags: Dict[str, str] = {}
 
         try:
             with open(self.filepath, "rb") as f:
@@ -224,7 +224,7 @@ class FLACTagHandler(AudioTagHandler):
 
     def _parse_vorbis_comments(self, data: bytes) -> Dict[str, str]:
         """Parse Vorbis comment block data."""
-        tags = {}
+        tags: Dict[str, str] = {}
 
         try:
             offset = 4  # Skip vendor string length
@@ -321,7 +321,7 @@ class M4ATagHandler(AudioTagHandler):
 
         Returns: {field: value} dict
         """
-        tags = {}
+        tags: Dict[str, str] = {}
         self.logger.debug(f"Reading M4A tags from {self.filepath}")
         # Simplified implementation
         return tags
@@ -331,7 +331,8 @@ class M4ATagHandler(AudioTagHandler):
         self.logger.info(f"Would write iTunes atoms to {self.filepath}:")
         for field, value in tags.items():
             atom = self.ATOM_MAPPING.get(field, f"©{field}".encode())
-            self.logger.debug(f"  {atom}: {value}")
+            atom_str = atom.decode() if isinstance(atom, bytes) else atom
+            self.logger.debug(f"  {atom_str}: {value}")
 
         return True
 
@@ -339,7 +340,7 @@ class M4ATagHandler(AudioTagHandler):
 class AudioTagFactory:
     """Factory for creating appropriate tag handlers."""
 
-    HANDLERS = [MP3TagHandler, FLACTagHandler, OGGTagHandler, M4ATagHandler]
+    HANDLERS = [MP3TagHandler, FLACTagHandler, OGGTagHandler, M4ATagHandler]  # type: ignore[misc]
 
     @staticmethod
     def create_handler(filepath: str) -> Optional[AudioTagHandler]:
