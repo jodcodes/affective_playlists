@@ -43,7 +43,7 @@ IS_MACOS = sys.platform == "darwin"
 # Import main modules
 temperament_analyzer = None
 metadata_fill = None
-plsort_module = None
+plsort_module = None  # type: ignore
 
 try:
     from src.temperament_analyzer import TemperamentAnalyzer, MusicAppClient, OpenAILLMClient
@@ -62,7 +62,7 @@ except Exception as e:
     logger.error(f"Error importing metadata_fill: {e}")
 
 try:
-    import src.plsort as plsort_module
+    import src.plsort as plsort_module  # type: ignore
 except ImportError as e:
     logger.warning(f"Could not import plsort: {e}")
 
@@ -144,7 +144,7 @@ def run_metadata_enrichment(args=None):
     # Header is printed by MetadataFillCLI, but we show info here
 
     try:
-        from metadata_fill import MetadataFillCLI
+        from src.metadata_fill import MetadataFillCLI
         import argparse
 
         # Check if whitelist is enabled

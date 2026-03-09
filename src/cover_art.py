@@ -260,6 +260,11 @@ class CoverArtEmbedder:
         Returns:
             True if successful
         """
+        # Check if file exists
+        if not os.path.exists(filepath):
+            self.logger.warning(f"File does not exist: {filepath}")
+            return False
+
         try:
             from mutagen.mp4 import MP4
 
@@ -302,6 +307,11 @@ class CoverArtEmbedder:
         Returns:
             True if successful
         """
+        # Check if file exists
+        if not os.path.exists(filepath):
+            self.logger.warning(f"File does not exist: {filepath}")
+            return False
+
         try:
             from mutagen.id3 import APIC, ID3
 

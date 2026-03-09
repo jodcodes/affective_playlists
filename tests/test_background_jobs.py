@@ -69,9 +69,8 @@ class TestJobSubmission:
 
     def test_job_id_format_enrichment(self):
         """Job ID should have format: enrichment-{timestamp}-{uuid}."""
-        from src.tasks import create_job_id
-
         # This function doesn't exist yet, will be created during implementation
+        # from src.tasks import create_job_id
         # job_id = create_job_id('enrichment')
         # assert job_id.startswith('enrichment-')
         # assert '-' in job_id[15:]  # Has uuid part
