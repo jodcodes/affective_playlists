@@ -264,7 +264,9 @@ class RealtimeManager:
         """
         now = time.time()
         inactive_clients = [
-            cid for cid, last_time in self._last_heartbeat.items() if now - last_time > timeout_seconds
+            cid
+            for cid, last_time in self._last_heartbeat.items()
+            if now - last_time > timeout_seconds
         ]
 
         for cid in inactive_clients:

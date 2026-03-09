@@ -25,15 +25,15 @@ class TestTaskQueueInitialization:
 
     def test_celery_initialized_with_redis_broker(self):
         """Celery should initialize with Redis broker on startup."""
-        with patch('src.celery_app.Celery') as mock_celery:
+        with patch("src.celery_app.Celery") as mock_celery:
             # This would test actual Celery initialization
             # For now, verify that broker URL is used
             assert True  # Placeholder until Celery is configured
 
     def test_broker_connection_failure_logs_warning(self):
         """System should log warning if broker unavailable."""
-        with patch('src.logger.setup_logger') as mock_logger:
-            logger = mock_logger('test')
+        with patch("src.logger.setup_logger") as mock_logger:
+            logger = mock_logger("test")
             # Should log warning about broker unavailability
             assert True  # Placeholder
 
@@ -64,13 +64,13 @@ class TestJobSubmission:
             # Submit enrichment
             job_id = f"enrichment-{time.time()}-uuid"
             job_ids.add(job_id)
-        
+
         assert len(job_ids) == 5, "All job IDs should be unique"
 
     def test_job_id_format_enrichment(self):
         """Job ID should have format: enrichment-{timestamp}-{uuid}."""
         from src.tasks import create_job_id
-        
+
         # This function doesn't exist yet, will be created during implementation
         # job_id = create_job_id('enrichment')
         # assert job_id.startswith('enrichment-')
@@ -79,11 +79,8 @@ class TestJobSubmission:
 
     def test_submit_analysis_task_with_payload(self):
         """Submitting analysis should accept and validate payload."""
-        payload = {
-            "track_ids": ["track-1", "track-2", "track-3"],
-            "playlist_id": "pl-1"
-        }
-        
+        payload = {"track_ids": ["track-1", "track-2", "track-3"], "playlist_id": "pl-1"}
+
         # POST /api/temperament/classify with payload
         # Should return: {"job_id": "...", "status": "queued", "total_tracks": 3}
         assert True  # Placeholder
@@ -97,7 +94,7 @@ class TestJobSubmission:
     def test_submission_with_invalid_payload_returns_400(self):
         """Invalid payload should return 400 Bad Request."""
         invalid_payload = {"invalid_key": "value"}
-        
+
         # POST /api/enrichment/start with bad payload
         # Should return 400
         assert True  # Placeholder
@@ -130,23 +127,23 @@ class TestTaskExecution:
     def test_progress_event_includes_all_fields(self):
         """Progress event should have all required fields."""
         expected_fields = [
-            'progress',
-            'current_track',
-            'total',
-            'current_operation',
-            'elapsed_seconds',
-            'eta_seconds'
+            "progress",
+            "current_track",
+            "total",
+            "current_operation",
+            "elapsed_seconds",
+            "eta_seconds",
         ]
-        
+
         progress_event = {
-            'progress': 50,
-            'current_track': 10,
-            'total': 20,
-            'current_operation': 'Processing track X',
-            'elapsed_seconds': 45,
-            'eta_seconds': 45
+            "progress": 50,
+            "current_track": 10,
+            "total": 20,
+            "current_operation": "Processing track X",
+            "elapsed_seconds": 45,
+            "eta_seconds": 45,
         }
-        
+
         for field in expected_fields:
             assert field in progress_event, f"Missing field: {field}"
 
@@ -218,7 +215,7 @@ class TestTaskRetries:
     def test_failed_task_retries_with_backoff(self):
         """Failed task should retry with exponential backoff."""
         backoff_schedule = [30, 60, 120]  # seconds between retries
-        
+
         # Task fails
         # Wait 30s → retry (attempt 2)
         # Wait 60s → retry (attempt 3)
@@ -229,23 +226,19 @@ class TestTaskRetries:
     def test_transient_errors_retry(self):
         """Network timeouts, rate limits should retry."""
         transient_errors = [
-            'ConnectionTimeout',
-            'TimeoutError',
-            'RateLimitError',
-            'TemporaryServiceDown'
+            "ConnectionTimeout",
+            "TimeoutError",
+            "RateLimitError",
+            "TemporaryServiceDown",
         ]
-        
+
         # Each should trigger retry
         assert True  # Placeholder
 
     def test_permanent_errors_dont_retry(self):
         """Validation errors, permission errors don't retry."""
-        permanent_errors = [
-            'ValidationError',
-            'PermissionError',
-            'MissingDataError'
-        ]
-        
+        permanent_errors = ["ValidationError", "PermissionError", "MissingDataError"]
+
         # These should NOT retry, fail immediately
         assert True  # Placeholder
 
@@ -339,26 +332,26 @@ class TestTaskStateTransitions:
     def test_valid_state_transitions(self):
         """Valid transitions: queued→running→completed/failed/cancelled."""
         valid_transitions = [
-            ('queued', 'running'),
-            ('running', 'completed'),
-            ('running', 'failed'),
-            ('running', 'cancelled'),
-            ('queued', 'cancelled'),
-            ('failed', 'queued'),  # retry
+            ("queued", "running"),
+            ("running", "completed"),
+            ("running", "failed"),
+            ("running", "cancelled"),
+            ("queued", "cancelled"),
+            ("failed", "queued"),  # retry
         ]
-        
+
         for from_state, to_state in valid_transitions:
             assert True  # Placeholder for state transition tests
 
     def test_invalid_state_transitions_rejected(self):
         """Invalid: completed→running, cancelled→running, etc."""
         invalid_transitions = [
-            ('completed', 'running'),
-            ('completed', 'failed'),
-            ('cancelled', 'running'),
-            ('timeout', 'running'),
+            ("completed", "running"),
+            ("completed", "failed"),
+            ("cancelled", "running"),
+            ("timeout", "running"),
         ]
-        
+
         for from_state, to_state in invalid_transitions:
             assert True  # Placeholder
 
@@ -386,11 +379,11 @@ class TestCeleryConfiguration:
     def test_task_naming_convention(self):
         """Task names follow convention: affective_playlists.tasks.{type}:{function}."""
         expected_names = [
-            'affective_playlists.tasks.enrichment:enrich_metadata',
-            'affective_playlists.tasks.temperament:analyze_mood',
-            'affective_playlists.tasks.organization:organize_playlists',
+            "affective_playlists.tasks.enrichment:enrich_metadata",
+            "affective_playlists.tasks.temperament:analyze_mood",
+            "affective_playlists.tasks.organization:organize_playlists",
         ]
-        
+
         # Tasks should be registered with these names
         assert True  # Placeholder
 

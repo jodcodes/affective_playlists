@@ -167,11 +167,7 @@ def init_db(database_url: Optional[str] = None) -> tuple:
         engine = create_engine(
             database_url,
             echo=os.getenv("DATABASE_ECHO", "false").lower() == "true",
-            connect_args=(
-                {"check_same_thread": False}
-                if "sqlite" in database_url
-                else {}
-            ),
+            connect_args=({"check_same_thread": False} if "sqlite" in database_url else {}),
         )
 
         # Create tables

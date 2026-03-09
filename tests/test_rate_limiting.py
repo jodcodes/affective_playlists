@@ -28,7 +28,7 @@ class TestRequestRateLimiting:
         """Requests within limit should be accepted."""
         rate_limit = 60  # per minute
         requests_made = 30
-        
+
         # 30 requests within 60-request limit
         # All should be accepted with 200 status
         assert requests_made < rate_limit
@@ -38,9 +38,9 @@ class TestRequestRateLimiting:
         headers = {
             "X-RateLimit-Limit": "60",
             "X-RateLimit-Remaining": "30",
-            "X-RateLimit-Reset": "1741608660"
+            "X-RateLimit-Reset": "1741608660",
         }
-        
+
         required_headers = ["X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"]
         for header in required_headers:
             assert header in headers
@@ -54,16 +54,10 @@ class TestRequestRateLimiting:
 
     def test_429_includes_retry_after_header(self):
         """429 response should include Retry-After."""
-        response_headers = {
-            "Retry-After": "47",
-            "Content-Type": "application/json"
-        }
-        
-        response_body = {
-            "error": "Rate limit exceeded",
-            "retry_after": 47
-        }
-        
+        response_headers = {"Retry-After": "47", "Content-Type": "application/json"}
+
+        response_body = {"error": "Rate limit exceeded", "retry_after": 47}
+
         assert "Retry-After" in response_headers
         assert response_body["retry_after"] == int(response_headers["Retry-After"])
 
@@ -72,9 +66,9 @@ class TestRequestRateLimiting:
         response = {
             "error": "Rate limit exceeded",
             "retry_after": 47,
-            "message": "Maximum 60 requests per minute allowed"
+            "message": "Maximum 60 requests per minute allowed",
         }
-        
+
         assert "error" in response
         assert "retry_after" in response
 
@@ -82,11 +76,11 @@ class TestRequestRateLimiting:
         """Burst limit should be higher than normal limit."""
         normal_limit = 100
         burst_limit = 150
-        
+
         # Requests 1-100: normal rate
         # Requests 101-150: use burst allowance
         # Requests 151+: rejection with 429
-        
+
         # After 1 minute window reset: back to 100
         assert burst_limit > normal_limit
 
@@ -94,7 +88,7 @@ class TestRequestRateLimiting:
         """Clients identified by IP + User-Agent."""
         client_a = {"ip": "192.168.1.1", "user_agent": "Chrome"}
         client_b = {"ip": "192.168.1.1", "user_agent": "Firefox"}
-        
+
         # Same IP, different UA → separate rate limits
         # Each client: separate quota
         assert client_a["user_agent"] != client_b["user_agent"]
@@ -115,9 +109,9 @@ class TestJobSubmissionQuotas:
         headers = {
             "X-RateLimit-Limit": "5",  # 5 jobs/minute
             "X-RateLimit-Remaining": "2",  # 2 left
-            "X-RateLimit-Reset": "1741608660"
+            "X-RateLimit-Reset": "1741608660",
         }
-        
+
         assert headers["X-RateLimit-Limit"] == "5"
 
     def test_exceed_per_minute_job_quota(self):
@@ -145,14 +139,18 @@ class TestJobSubmissionQuotas:
             "minute_limit": 5,
             "minute_usage": 2,
             "minute_remaining": 3,
-            "minute_reset_at": "2026-03-09T15:31:00Z"
+            "minute_reset_at": "2026-03-09T15:31:00Z",
         }
-        
+
         required_fields = [
-            "daily_limit", "daily_usage", "daily_remaining",
-            "minute_limit", "minute_usage", "minute_remaining"
+            "daily_limit",
+            "daily_usage",
+            "daily_remaining",
+            "minute_limit",
+            "minute_usage",
+            "minute_remaining",
         ]
-        
+
         for field in required_fields:
             assert field in quota_response
 
@@ -176,9 +174,9 @@ class TestAdaptiveBackpressure:
             "total_in_queue": 500,
             "wait_minutes": 120,
             "expected_start_time": "2026-03-09T17:30:00Z",
-            "warning": "Server busy, expect delays"
+            "warning": "Server busy, expect delays",
         }
-        
+
         assert response["position"] < response["total_in_queue"]
         assert response["wait_minutes"] > 0
 

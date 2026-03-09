@@ -37,7 +37,7 @@ class TestWebSocketConnection:
         for _ in range(5):
             session_id = f"sid-{int(time.time() * 1000)}"
             session_ids.add(session_id)
-        
+
         # In real test, these would come from WebSocket server
         # assert len(session_ids) == 5
 
@@ -81,7 +81,7 @@ class TestWebSocketReconnection:
     def test_client_auto_reconnects_with_exponential_backoff(self):
         """Reconnection attempts should use exponential backoff."""
         backoff_schedule = [1, 2, 4, 8, 16]  # seconds
-        
+
         # Attempt 1: wait 1s, retry
         # Attempt 2: wait 2s, retry
         # Attempt 3: wait 4s, retry
@@ -119,15 +119,21 @@ class TestProgressEvents:
             "current_operation": "Processing track: Song Name",
             "elapsed_seconds": 120,
             "eta_seconds": 146,
-            "timestamp": "2026-03-09T15:30:00Z"
+            "timestamp": "2026-03-09T15:30:00Z",
         }
-        
+
         required_fields = [
-            "event", "job_id", "progress", "current_track",
-            "total_tracks", "current_operation", "elapsed_seconds",
-            "eta_seconds", "timestamp"
+            "event",
+            "job_id",
+            "progress",
+            "current_track",
+            "total_tracks",
+            "current_operation",
+            "elapsed_seconds",
+            "eta_seconds",
+            "timestamp",
         ]
-        
+
         for field in required_fields:
             assert field in progress_event
 
@@ -152,9 +158,9 @@ class TestProgressEvents:
                     # ...
                 ]
             },
-            "timestamp": "2026-03-09T15:30:00Z"
+            "timestamp": "2026-03-09T15:30:00Z",
         }
-        
+
         assert completion_event["event"] == "job:completed"
         assert "results" in completion_event
         assert completion_event["status"] == "completed"
@@ -168,9 +174,9 @@ class TestProgressEvents:
             "error_message": "Maximum retries exceeded: API unavailable",
             "error_code": "SERVICE_UNAVAILABLE",
             "last_attempt": "2026-03-09T15:30:45Z",
-            "timestamp": "2026-03-09T15:30:00Z"
+            "timestamp": "2026-03-09T15:30:00Z",
         }
-        
+
         assert failure_event["event"] == "job:failed"
         assert "error_message" in failure_event
         assert "error_code" in failure_event
@@ -183,9 +189,9 @@ class TestProgressEvents:
             "status": "cancelled",
             "cancelled_at": "2026-03-09T15:30:30Z",
             "progress": 67,
-            "message": "Job cancelled by user"
+            "message": "Job cancelled by user",
         }
-        
+
         assert cancel_event["event"] == "job:cancelled"
 
 
@@ -205,7 +211,7 @@ class TestServerSentEvents:
 data: {"progress": 45, "current_track": 9, "total": 20}
 
 """
-        
+
         # Server sends this format
         assert "event: progress" in sse_message
         assert "data:" in sse_message

@@ -32,11 +32,19 @@ class TestDatabaseInitialization:
     def test_migration_creates_jobs_table(self):
         """jobs table should be created with required columns."""
         expected_columns = [
-            'id', 'type', 'status', 'payload',
-            'created_at', 'updated_at', 'completed_at',
-            'user_agent', 'client_ip', 'error_message', 'error_code'
+            "id",
+            "type",
+            "status",
+            "payload",
+            "created_at",
+            "updated_at",
+            "completed_at",
+            "user_agent",
+            "client_ip",
+            "error_message",
+            "error_code",
         ]
-        
+
         # After migration:
         # SELECT * FROM jobs should work
         # Columns present
@@ -45,20 +53,21 @@ class TestDatabaseInitialization:
     def test_migration_creates_job_results_table(self):
         """job_results table should be created."""
         expected_columns = [
-            'id', 'job_id', 'result_json',
-            'metadata', 'stored_at', 'result_size_bytes'
+            "id",
+            "job_id",
+            "result_json",
+            "metadata",
+            "stored_at",
+            "result_size_bytes",
         ]
-        
+
         # After migration: table exists with columns
         assert True  # Placeholder
 
     def test_migration_creates_job_events_table(self):
         """job_events table (audit log) should be created."""
-        expected_columns = [
-            'id', 'job_id', 'event_type',
-            'timestamp', 'details'
-        ]
-        
+        expected_columns = ["id", "job_id", "event_type", "timestamp", "details"]
+
         # After migration: table exists
         assert True  # Placeholder
 
@@ -99,11 +108,8 @@ class TestJobRecordCreation:
         """Job record should store input parameters."""
         # payload field should contain:
         # {"playlist_ids": ["pl-1", "pl-2"], "sources": ["spotify"]}
-        job_payload = {
-            "playlist_ids": ["pl-1", "pl-2"],
-            "sources": ["spotify", "genius"]
-        }
-        
+        job_payload = {"playlist_ids": ["pl-1", "pl-2"], "sources": ["spotify", "genius"]}
+
         # Should be stored as JSON
         assert isinstance(job_payload, dict)
 
@@ -115,9 +121,9 @@ class TestJobRecordCreation:
             "status": "queued",
             "user_agent": "Mozilla/5.0...",
             "client_ip": "127.0.0.1",
-            "created_at": "2026-03-09T15:30:00Z"
+            "created_at": "2026-03-09T15:30:00Z",
         }
-        
+
         # Should have user_agent and client_ip
         assert "user_agent" in job_record
         assert "client_ip" in job_record
@@ -167,9 +173,9 @@ class TestJobStatusTransitions:
             "error_message": "API rate limited",
             "error_code": "RATE_LIMIT",
             "failed_at": "2026-03-09T15:30:45Z",
-            "attempt_count": 4
+            "attempt_count": 4,
         }
-        
+
         assert failed_job["status"] == "failed"
         assert "error_message" in failed_job
         assert "error_code" in failed_job
@@ -354,7 +360,7 @@ class TestConcurrentAccess:
 
     def test_transaction_isolation_prevents_dirty_reads(self):
         """Incomplete transactions not visible to others."""
-        # Transaction 1: UPDATE job progress to 75% 
+        # Transaction 1: UPDATE job progress to 75%
         # Transaction 2: reads job → should not see 75% until commit
         # Isolation level: READ_COMMITTED or higher
         assert True  # Placeholder

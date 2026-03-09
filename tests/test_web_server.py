@@ -30,9 +30,10 @@ from src.web_server import app
 def client():
     """Create Flask test client."""
     app.config["TESTING"] = True
-    
+
     # Reset global state before each test
     import src.web_server as ws
+
     ws._enrichment_state = {
         "running": False,
         "progress": 0,
@@ -58,7 +59,7 @@ def client():
     }
     ws._temperament_results = []
     ws._user_settings = {}
-    
+
     with app.test_client() as client:
         yield client
 
@@ -417,9 +418,7 @@ class TestErrorHandling:
     def test_invalid_json_returns_error(self, client):
         """Invalid JSON should be handled gracefully."""
         response = client.post(
-            "/api/settings",
-            data="invalid json",
-            content_type="application/json"
+            "/api/settings", data="invalid json", content_type="application/json"
         )
         # Should either return 400, 500 (Flask error), or handle gracefully with 200
         assert response.status_code in [400, 500, 200]
@@ -460,18 +459,12 @@ class TestMoveEndpoint:
 
     def test_move_with_confirmation_returns_200(self, client):
         """Move with confirmed=true should return 200."""
-        response = client.post(
-            "/api/playlists/move",
-            json={"confirmed": True}
-        )
+        response = client.post("/api/playlists/move", json={"confirmed": True})
         assert response.status_code == 200
 
     def test_move_response_has_results(self, client):
         """Move response should have results field."""
-        response = client.post(
-            "/api/playlists/move",
-            json={"confirmed": True}
-        )
+        response = client.post("/api/playlists/move", json={"confirmed": True})
         data = json.loads(response.data)
         assert "results" in data
 

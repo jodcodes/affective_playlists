@@ -94,7 +94,9 @@ def enrich_metadata(
     except Exception as e:
         logger.error(f"Enrichment job {job_id} failed: {e}")
         job_store = get_job_store()
-        job_store.update_job_status(job_id, "failed", error_message=str(e), error_code="ENRICHMENT_ERROR")
+        job_store.update_job_status(
+            job_id, "failed", error_message=str(e), error_code="ENRICHMENT_ERROR"
+        )
         raise
 
 
@@ -173,13 +175,17 @@ def analyze_mood(
         job_store.store_result(job_id, result)
         job_store.update_job_status(job_id, "completed")
 
-        logger.info(f"Temperament analysis job {job_id} completed: {len(track_ids)} tracks analyzed")
+        logger.info(
+            f"Temperament analysis job {job_id} completed: {len(track_ids)} tracks analyzed"
+        )
 
         return result
     except Exception as e:
         logger.error(f"Temperament analysis job {job_id} failed: {e}")
         job_store = get_job_store()
-        job_store.update_job_status(job_id, "failed", error_message=str(e), error_code="ANALYSIS_ERROR")
+        job_store.update_job_status(
+            job_id, "failed", error_message=str(e), error_code="ANALYSIS_ERROR"
+        )
         raise
 
 
@@ -259,7 +265,9 @@ def organize_playlists(
     except Exception as e:
         logger.error(f"Organization job {job_id} failed: {e}")
         job_store = get_job_store()
-        job_store.update_job_status(job_id, "failed", error_message=str(e), error_code="ORGANIZATION_ERROR")
+        job_store.update_job_status(
+            job_id, "failed", error_message=str(e), error_code="ORGANIZATION_ERROR"
+        )
         raise
 
 

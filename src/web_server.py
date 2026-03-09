@@ -31,6 +31,7 @@ from src.logger import setup_logger
 # Try to import Celery tasks
 try:
     from src.tasks import enrich_metadata, analyze_mood, organize_playlists
+
     CELERY_AVAILABLE = True
 except ImportError:
     CELERY_AVAILABLE = False
@@ -477,7 +478,7 @@ def enrichment_status():
     """
     try:
         job_id = request.args.get("job_id")
-        
+
         if not job_id:
             # Return fallback status if no specific job requested
             return jsonify(
@@ -491,25 +492,25 @@ def enrichment_status():
                     "eta_seconds": None,
                 }
             )
-        
+
         # Get job from database
         job_store = get_job_store()
         job = job_store.get_job(job_id)
-        
+
         if not job:
             return jsonify({"error": "Job not found"}), 404
-        
+
         # Calculate elapsed time
         elapsed = 0
         if job.started_at:
             elapsed = int((time.time() - job.started_at.timestamp()))
-        
+
         # Estimate ETA
         eta_seconds = None
         if job.status == "running" and job.progress > 0:
             estimated_total = (elapsed * 100) / job.progress
             eta_seconds = max(0, int(estimated_total - elapsed))
-        
+
         return jsonify(
             {
                 "running": job.status == "running",
@@ -551,10 +552,10 @@ def start_enrichment():
         data = request.get_json() or {}
         playlist_ids = data.get("playlist_ids", [])
         sources = data.get("sources", ["spotify"])
-        
+
         # Create unique job ID
         job_id = f"enrichment-{int(time.time())}-{uuid.uuid4().hex[:8]}"
-        
+
         # Persist to database
         job_store = get_job_store()
         job_store.create_job(
@@ -564,7 +565,7 @@ def start_enrichment():
             user_agent=request.headers.get("User-Agent"),
             client_ip=request.remote_addr,
         )
-        
+
         # Submit to Celery queue if available
         if CELERY_AVAILABLE:
             try:
@@ -577,17 +578,20 @@ def start_enrichment():
                 logger.warning(f"Celery unavailable, job persisted to database: {e}")
         else:
             logger.info(f"Celery unavailable, job persisted to database: {job_id}")
-        
+
         total_tracks = len(playlist_ids) * 10  # Mock estimation
-        
-        return jsonify(
-            {
-                "job_id": job_id,
-                "status": "queued",
-                "total_tracks": total_tracks,
-                "success": True,
-            }
-        ), 202  # 202 ACCEPTED
+
+        return (
+            jsonify(
+                {
+                    "job_id": job_id,
+                    "status": "queued",
+                    "total_tracks": total_tracks,
+                    "success": True,
+                }
+            ),
+            202,
+        )  # 202 ACCEPTED
     except Exception as e:
         logger.error(f"Failed to start enrichment: {e}")
         return jsonify({"error": str(e)}), 500
@@ -776,6 +780,7 @@ def save_settings():
 @app.before_request
 def before_request_handler():
     """Initialize database on first request."""
+
     def init():
         try:
             if not hasattr(app, "_db_initialized"):
@@ -783,7 +788,7 @@ def before_request_handler():
                 app._db_initialized = True
         except Exception as e:
             logger.warning(f"Database initialization skipped: {e}")
-    
+
     # Only run once
     init()
 
