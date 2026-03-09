@@ -24,6 +24,7 @@ from flask import Flask, jsonify, render_template_string, request
 
 from src.db import setup_database
 from src.job_store import get_job_store
+from src.rate_limiter import rate_limit, check_job_quota
 from src.logger import setup_logger
 
 # Try to import Celery tasks
@@ -457,6 +458,7 @@ def move_playlists():
 
 
 @app.route("/api/enrichment/status", methods=["GET"])
+@rate_limit(limit=300)  # Status polls can be frequent
 def enrichment_status():
     """
     Get current enrichment status and progress.
@@ -524,6 +526,8 @@ def enrichment_status():
 
 
 @app.route("/api/enrichment/start", methods=["POST"])
+@rate_limit(limit=100)  # 100 requests/min for general API
+@check_job_quota()  # Add stricter job submission quota (5/min, 100/day)
 def start_enrichment():
     """
     Begin metadata enrichment process.
@@ -819,6 +823,7 @@ def get_fallback_html() -> str:
 
 
 @app.route("/api/jobs/<job_id>", methods=["GET"])
+@rate_limit(limit=200)  # Reads
 def get_job(job_id: str):
     """
     Get specific job by ID.
@@ -851,6 +856,7 @@ def get_job(job_id: str):
 
 
 @app.route("/api/jobs", methods=["GET"])
+@rate_limit(limit=200)  # Reads can be more liberal
 def list_jobs():
     """
     List all jobs with pagination.
