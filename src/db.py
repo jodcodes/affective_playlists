@@ -6,7 +6,7 @@ References: openspec/specs/job-persistence/spec.md
 
 import os
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional, Type
 
 from sqlalchemy import JSON, Column, DateTime, Integer, String, Text, create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
@@ -15,7 +15,7 @@ from src.logger import setup_logger
 
 logger = setup_logger(__name__)
 
-Base = declarative_base()
+Base: Type[Any] = declarative_base()  # type: ignore[assignment]
 
 
 class Job(Base):

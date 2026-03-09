@@ -29,6 +29,11 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "openai>=1.0.0",
     "flask>=3.0.0",
+    "celery>=5.3.0",
+    "redis>=5.0.0",
+    "sqlalchemy>=2.0.0",
+    "mutagen>=1.46.0",
+    "tqdm>=4.66.0",
 ]
 
 [project.optional-dependencies]
@@ -54,8 +59,11 @@ affective_playlists = "main:main"
 [tool.setuptools]
 packages = ["src"]
 
+[tool.setuptools.package-dir]
+"" = "."
+
 [tool.setuptools.package-data]
-affective_playlists = ["src/**/*"]
+src = ["**/*"]
 
 [tool.black]
 line-length = 100
@@ -77,7 +85,7 @@ namespace_packages = true
 disable_error_code = ["operator", "abstract", "no-any-return"]
 
 [[tool.mypy.overrides]]
-module = ["tqdm", "anthropic.*", "mutagen.*"]
+module = ["anthropic.*", "mutagen.*", "celery.*"]
 ignore_missing_imports = true
 
 [tool.pylint.messages_control]

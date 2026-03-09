@@ -225,7 +225,7 @@ def organize_playlists(
         total_playlists = len(playlist_ids)
         organized_items = []
 
-        for i, playlist_id in enumerate(total_playlists):
+        for i, playlist_id in enumerate(playlist_ids):
             progress = int(((i + 1) / total_playlists) * 100)
 
             # Update progress

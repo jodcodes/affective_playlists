@@ -30,7 +30,7 @@ from src.realtime import get_realtime_manager, simulate_sse_stream
 
 # Try to import Celery tasks
 try:
-    from src.tasks import analyze_mood, enrich_metadata, organize_playlists
+    from src.tasks import analyze_mood, enrich_metadata
 
     CELERY_AVAILABLE = True
 except ImportError:
@@ -919,34 +919,6 @@ def list_jobs():
     except Exception as e:
         logger.error(f"Failed to list jobs: {e}")
         return jsonify({"error": str(e)}), 500
-
-
-def get_fallback_html() -> str:
-    """Return fallback HTML if index.html not found."""
-    return """
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>affective_playlists - Browser Frontend</title>
-        <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; }
-            .loading { text-align: center; padding: 50px; color: #666; }
-        </style>
-    </head>
-    <body>
-        <div class="loading">
-            <h1>affective_playlists</h1>
-            <p>Loading front-end assets...</p>
-        </div>
-        <script>
-            console.error('index.html not found - run: npm install or setup frontend files');
-        </script>
-    </body>
-    </html>
-    """
 
 
 def run_server(host: str = WEB_HOST, port: int = WEB_PORT, debug: bool = WEB_DEBUG):
