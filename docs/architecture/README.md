@@ -2,6 +2,56 @@
 
 High-level system design and technical infrastructure documentation.
 
+## Package Structure & Imports
+
+The project uses a clean **src-layout** package structure with proper Python packaging:
+
+```
+affective_playlists/
+├── main.py                      # Application entrypoint (uses src.* imports)
+├── pyproject.toml               # Package configuration (packages = ["src"])
+├── src/
+│   ├── __init__.py              # Package marker (documents import strategy)
+│   ├── logger.py
+│   ├── config.py
+│   ├── apple_music.py
+│   ├── llm_client.py
+│   └── ... other modules
+├── tests/
+│   ├── test_*.py                # All use src.* imports
+│   └── __init__.py
+└── docs/
+    ├── architecture/ (this file)
+    └── rules/CODE_QUALITY_STANDARDS.md (import rules)
+```
+
+### Import Strategy
+
+**All internal imports use absolute src.* pattern:**
+
+```python
+# main.py and all other modules
+from src.logger import setup_logger
+from src.apple_music import AppleMusicInterface
+from src.config import load_centralized_whitelist
+
+# NOT: from logger import ..., or sys.path.insert()
+```
+
+**Why this works:**
+1. `src/` is declared as a package in `pyproject.toml`
+2. After `pip install -e .`, the `src` package becomes importable
+3. When running `python main.py`, Python can resolve relative paths to find `src/`
+4. This approach works from any directory (unlike sys.path hacks)
+
+**Key rules from CODE_QUALITY_STANDARDS.md:**
+- ✅ Use `from src.module import name` everywhere
+- ✅ Use relative imports within src/ for internal references: `from .logger import`
+- ❌ Never use `sys.path.insert()` in committed code
+- ❌ Never use fragile relative path hacks like `../../../src`
+
+---
+
 ## Architecture Overview
 
 **affective_playlists** is a unified Python CLI application combining three feature domains:

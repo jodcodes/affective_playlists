@@ -33,7 +33,7 @@ The affective_playlists project uses a spec-driven brownfield workflow (see [AGE
 
 ## How to Use These Files
 
-1. **For understanding current behavior**: Use domain guides ([docs/domain-guides/](../domain-guides/)) and OpenSpec specs instead.
+1. **For understanding current behavior**: Use OpenSpec specs ([openspec/specs/](../../openspec/specs/)) and archived-reports instead.
 2. **For historical traceability**: These files show the original requirements and context from the brownfield phase.
 3. **For references in code review**: Always link to OpenSpec specs, not legacy specs.
 
@@ -47,7 +47,7 @@ The affective_playlists project uses a spec-driven brownfield workflow (see [AGE
 
 ## Related Documentation
 
-- [Domain Guides](../domain-guides/) — Modern feature-specific documentation
+- [OpenSpec Specs](../../openspec/specs/) — Current authoritative specifications
 - [Architecture Guide](../architecture/) — Current system design
 - [OpenSpec](../../openspec/) — Source of truth for all specs
 

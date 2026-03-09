@@ -2,13 +2,17 @@
 
 This file tracks implemented behavior not yet codified in `openspec/specs/`.
 
+## Seeded This Iteration (Priority 3)
+- ✅ `src/apple_music.py`: AppleScript invocation behavior and failure modes
+  → Spec: openspec/specs/apple_music/spec.md (12 scenarios)
+- ✅ `src/llm_client.py`: retries, timeout strategy, and provider fallback behavior
+  → Spec: openspec/specs/llm_client/spec.md (11 scenarios)
+
 ## Critical (Seed Before Major Changes)
-- `src/apple_music.py`: AppleScript invocation behavior and failure modes
 - `src/metadata_fill.py`: interactive flow and enrichment orchestration details
 - `src/playlist_manager.py`: move/organization rules and safety constraints
 
-## High (Seed This Iteration)
-- `src/llm_client.py`: retries, timeout strategy, and provider fallback behavior
+## High (Next Iteration)
 - `src/playlist_classifier.py`: scoring thresholds and fallback classification behavior
 - `src/track_metadata.py`: external source query order and data normalization constraints
 

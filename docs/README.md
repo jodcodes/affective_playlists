@@ -8,7 +8,7 @@ This folder contains all documentation for the affective_playlists project, orga
 docs/
 ├── README.md                          # This file
 ├── OVERVIEW.md                        # Project summary and quick-start guide
-├── domain-guides/                     # Feature domain documentation (source of truth)
+├── domain-guides/                     # DEPRECATED: Content migrated to openspec/specs/
 │   ├── README.md                      # Domain guides index
 │   ├── metadata/                      # Metadata enrichment domain (metad_enr)
 │   ├── playlists/                     # Playlist organization domain (plsort)
@@ -58,10 +58,12 @@ docs/
 ## Navigation Guide
 
 ### For Feature Implementation
-Start with [Domain Guides](domain-guides/) — these explain each feature's behavior with links to authoritative OpenSpec specifications:
-- [Metadata Enrichment](domain-guides/metadata/) — `metad_enr` feature
-- [Playlist Organization](domain-guides/playlists/) — `plsort` feature  
-- [Temperament Analysis](domain-guides/temperament/) — `4tempers` feature
+
+Start with **OpenSpec Specifications** — these contain authoritative requirements with implementation context:
+
+- [Metadata Enrichment](../openspec/specs/metadata/spec.md) — `metad_enr` feature
+- [Playlist Organization](../openspec/specs/playlists/spec.md) — `plsort` feature  
+- [Temperament Analysis](../openspec/specs/temperament/spec.md) — `4tempers` feature
 
 ### For System Design
 See [Architecture](architecture/) for high-level system design, component organization, and data flow.
@@ -95,9 +97,9 @@ Reference [Reports](reference-reports/) for implementation analysis with metrics
 
 ## Source of Truth Hierarchy
 
-1. **OpenSpec** (`openspec/specs/`) — Authoritative behavior specifications
-2. **Domain Guides** (`domain-guides/`) — Explain specs with implementation context
-3. **Architecture** (`architecture/`) — System-level design
+1. **OpenSpec Specs** (`openspec/specs/`) — Authoritative requirements with implementation context
+2. **Architecture** (`architecture/`) — System-level design
+3. **Code Quality Standards** (`rules/CODE_QUALITY_STANDARDS.md`) — Development standards
 4. **Legacy Specs** (`legacy-specs/`) — Historical reference only
 
 ## Project Overview

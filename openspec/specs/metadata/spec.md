@@ -1,5 +1,37 @@
 # Metadata Specifications
 
+## Context & Implementation Guide
+
+Metadata enrichment enables users to automatically populate missing track information (BPM, genre, release year) by querying multiple external databases in priority order. The system is designed for safe, reliable operation with robust error handling and source provenance tracking.
+
+### Core Features
+
+- **Field-aware querying**: Skip sources for fields that are already populated
+- **Multi-source fallback**: Configured source priority with exhaustive search capabilities
+- **Source provenance**: Track which source provided each enriched field
+- **Safe write-back**: Per-track error isolation during batch operations
+- **Apple Music compatibility**: Skip cover-art embedding for tracks from Apple Music
+
+### Implementation Files
+
+- `src/metadata_enrichment.py` - Core enrichment orchestration
+- `src/metadata_fill.py` - Field population logic
+- `src/metadata_queries.py` - Multi-source query handling
+- `src/llm_client.py` - LLM-based enrichment fallback
+- `tests/test_metadata_enrichment.py` - Test suite
+
+### Configuration
+
+- `data/config/weights.json` - Source priority and field weights
+- Environment variables for API credentials (Spotify, MusicBrainz, Last.fm, etc.)
+
+### Related Domains
+
+- **Playlist Organization** (`playlists`) - Uses enriched metadata for genre classification
+- **Temperament Analysis** (`temperament`) - Uses enriched metadata for mood classification
+
+---
+
 ## Overview
 Metadata enrichment SHALL fill missing metadata fields for selected tracks using multiple sources with deterministic fallback behavior.
 

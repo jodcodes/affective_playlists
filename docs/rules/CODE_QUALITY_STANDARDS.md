@@ -325,12 +325,43 @@ if len(playlist) > MAX_PLAYLIST_SIZE:
     process_in_batches(playlist, BATCH_SIZE)
 ```
 
+### Anti-Pattern 5: Runtime sys.path Manipulation
+```python
+# BAD - NEVER DO THIS IN COMMITTED CODE
+import sys
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
+
+from logger import setup_logger  # Fragile - depends on sys.path hack
+```
+
+**Fix:**
+```python
+# GOOD - Use proper package imports
+from src.logger import setup_logger
+
+# Or (in installed package context):
+from logger import setup_logger  # Works after pip install -e .
+```
+
+**Why**: 
+- sys.path manipulation breaks when code is run from different directories
+- Makes imports brittle and hard to understand
+- Hides real import dependencies
+- Prevents proper package discovery
+- Breaks when installed via pip
+
+**Rule: No `sys.path.insert()` in committed source code.**
+
 ## Review Checklist
 
 Before submitting code for review:
 - [ ] All functions have type hints
 - [ ] All public functions have docstrings
 - [ ] No bare `except:` clauses
+- [ ] No `sys.path.insert()` calls in source code
 - [ ] Uses `logger` for all operational output
 - [ ] No hardcoded values (use constants)
 - [ ] Imports properly organized

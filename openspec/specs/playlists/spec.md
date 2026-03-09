@@ -1,5 +1,42 @@
 # Playlists Specifications
 
+## Context & Implementation Guide
+
+Playlist organization enables users to classify playlists by genre and optionally move them into configured folder structures. The system provides a safe workflow with dry-run preview, explicit confirmation steps, and platform-specific constraints.
+
+### Core Features
+
+- **Genre classification**: Classify playlists using available track metadata and configured genre logic
+- **Safe organization**: Explicit user confirmation before executing playlist moves
+- **Dry-run mode**: Preview intended moves without modifying playlists
+- **Unclassified handling**: Playlists that cannot be reliably classified are flagged and not moved
+- **Platform constraints**: Move operations require macOS; metadata enrichment works on all platforms
+
+### Implementation Files
+
+- `src/playlist_classifier.py` - Genre classification logic
+- `src/playlist_manager.py` - Playlist move orchestration
+- `src/playlist_utils.py` - Playlist utilities
+- `tests/test_playlist_classifier.py` - Test suite
+
+### Configuration
+
+- `data/config/playlist_folders.json` - Target folder mappings by genre
+- `data/config/genre_map.json` - Genre classification rules
+
+### Deployment Constraints
+
+- **macOS required**: Playlist move operations require macOS and Music.app access via AppleScript
+- **Non-macOS**: Metadata enrichment can still run in folder mode without modification
+- **Apple Music**: The system integrates with Apple Music library on macOS
+
+### Related Domains
+
+- **Metadata Enrichment** (`metadata`) - Provides enriched metadata for classification
+- **Temperament Analysis** (`temperament`) - Alternative classification approach based on mood
+
+---
+
 ## Overview
 Playlist organization SHALL classify playlists by genre and optionally move them into configured folders with explicit confirmation safeguards.
 

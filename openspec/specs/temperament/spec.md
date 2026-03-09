@@ -1,5 +1,59 @@
 # Temperament Specifications
 
+## Context & Implementation Guide
+
+Temperament analysis uses language models to interpret track metadata and playlist context, classifying each playlist into exactly one of four emotional categories. The system includes resilient processing, API credential validation, and platform-specific constraints.
+
+### Four Temperaments
+
+| Temperament | Mood Profile | Example Traits |
+|-------------|--------------|----------------|
+| **Woe** | Sad, melancholic, introspective | Ballads, acoustic, emotional vocals |
+| **Frolic** | Happy, upbeat, energetic | Pop, dance, uplifting rhythms |
+| **Dread** | Dark, ominous, intense | Industrial, metal, atmospheric tension |
+| **Malice** | Aggressive, hostile, chaotic | Punk, noise, confrontational energy |
+
+### Core Features
+
+- **Four-category classification**: Woe (sad), Frolic (happy), Dread (dark), Malice (aggressive)
+- **LLM-based interpretation**: Uses OpenAI GPT to analyze playlist mood
+- **Music.app authentication**: Requires valid Music.app access on macOS
+- **Early credential validation**: Detects missing API keys before client initialization
+- **Per-playlist error handling**: Graceful failure with clear logging on API timeouts
+- **Platform constraints**: Requires macOS for Music.app access; skips on non-macOS with guidance
+
+### Implementation Files
+
+- `src/temperament_analyzer.py` - Core analysis orchestration
+- `src/llm_client.py` - OpenAI API integration
+- `src/prompts.py` - LLM prompt templates
+- `tests/test_temperament_analyzer_quick.py` - Test suite
+
+### Configuration
+
+- Environment variable: `OPENAI_API_KEY` - Required for GPT integration
+- `src/config.py` - Core configuration handling
+
+### API Integration
+
+- **Provider**: OpenAI (GPT models)
+- **Authentication**: API key via environment variable
+- **Timeout**: Configurable with retry policy
+- **Fallback**: Non-zero exit code on exhausted retries with detailed logging
+
+### Deployment Constraints
+
+- **macOS required**: Temperament analysis requires Music.app access via AppleScript
+- **API credentials required**: OPENAI_API_KEY must be set in environment
+- **Non-macOS**: System exits gracefully with platform guidance; alternative workflows still available
+
+### Related Domains
+
+- **Metadata Enrichment** (`metadata`) - Provides enriched metadata as input context
+- **Playlist Organization** (`playlists`) - Alternative classification based on genre
+
+---
+
 ## Overview
 Temperament analysis SHALL classify playlists into one of four temperaments using LLM-based interpretation of track/playlist metadata.
 

@@ -41,10 +41,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/sokkohai/affective_playlists"
-Documentation = "https://github.com/sokkohai/affective_playlists/blob/main/README.md"
-Repository = "https://github.com/sokkohai/affective_playlists.git"
-Issues = "https://github.com/sokkohai/affective_playlists/issues"
+Homepage = "https://github.com/jodcodes/affective_playlists"
+Documentation = "https://github.com/jodcodes/affective_playlists/blob/main/README.md"
+Repository = "https://github.com/jodcodes/affective_playlists.git"
+Issues = "https://github.com/jodcodes/affective_playlists/issues"
 
 [project.scripts]
 affective-playlists = "main:main"

@@ -30,6 +30,6 @@ These documents serve as:
 ## Current Status
 
 The project has evolved from these snapshots. For current state:
-- See [Domain Guides](../domain-guides/) for feature status
+- See [OpenSpec Specs](../../openspec/specs/) for current feature status
 - See [Project Management](../project-management/) for active planning
 - See [OpenSpec](../../openspec/) for authoritative specifications

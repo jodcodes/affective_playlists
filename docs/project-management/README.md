@@ -31,6 +31,6 @@ Immediate, near-term, and mid-term development directions (30-90 day horizon).
 
 ## Related Documentation
 
-- [Domain Guides](../domain-guides/) — Feature-specific documentation
+- [OpenSpec Specs](../../openspec/specs/) — Authoritative specifications with implementation context
 - [OpenSpec](../../openspec/) — Specification management
 - [Architecture](../architecture/) — System design overview

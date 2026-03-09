@@ -124,7 +124,7 @@ affective_playlists/
 │
 ├── docs/                   ← Documentation
 │   ├── rules/             ← Development standards
-│   ├── domain-guides/     ← Feature domain specifications
+│   ├── domain-guides/     ← DEPRECATED (migrated to openspec/specs)
 │   └── project-management/← Project tracking docs
 │
 ├── openspec/               ← OpenSpec specification framework
@@ -301,9 +301,8 @@ OPENAI_API_KEY=sk-your-actual-key
 - **[QUICKSTART.md](QUICKSTART.md)** - Quick reference guide
 - **[docs/INSTALLATION.md](docs/INSTALLATION.md)** - Detailed installation
 - **[docs/OVERVIEW.md](docs/OVERVIEW.md)** - Architecture overview
-- **[docs/domain-guides/](docs/domain-guides/)** - Feature domain specifications
+- **[openspec/specs/](openspec/specs/)** - Authoritative feature specifications
 - **[docs/rules/](docs/rules/)** - Development standards
-- **[openspec/specs/](openspec/specs/)** - OpenSpec specifications
 
 ## Contributing
 
