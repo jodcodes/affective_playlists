@@ -1,6 +1,6 @@
 # affective_playlists - Quick Start Guide
 
-## One-Command Installation ⚡
+## One-Command Installation
 
 ```bash
 git clone https://github.com/jodcodes/affective_playlists.git
@@ -40,7 +40,7 @@ source activate.sh
 
 You should see:
 ```
-✓ affective_playlists environment ready!
+affective_playlists environment ready!
 
 Available commands:
   affective-playlists                 # Interactive menu

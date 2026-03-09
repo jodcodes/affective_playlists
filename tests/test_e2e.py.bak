@@ -8,9 +8,9 @@ Tests for:
 3. plsort - Playlist organization
 """
 
-import sys
-import os
 import json
+import os
+import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent
@@ -220,7 +220,7 @@ def test_cli():
     results = TestResult()
     
     import subprocess
-    
+
     # Test --help
     try:
         result = subprocess.run(

@@ -20,8 +20,8 @@ TEMPERAMENTS = {
             "Minor keys and slow tempos",
             "Emotional vulnerability",
             "Introspective lyrics about loss or heartbreak",
-            "Themes of isolation or depression"
-        ]
+            "Themes of isolation or depression",
+        ],
     },
     "Frolic": {
         "display": "Frolic (Sanguine)",
@@ -32,8 +32,8 @@ TEMPERAMENTS = {
             "Major keys and faster tempos",
             "Positive and uplifting lyrics",
             "Themes of love, celebration, or success",
-            "Infectious rhythms for dancing"
-        ]
+            "Infectious rhythms for dancing",
+        ],
     },
     "Dread": {
         "display": "Dread (Phlegmatic)",
@@ -44,8 +44,8 @@ TEMPERAMENTS = {
             "Dark or ominous soundscapes",
             "Themes of fear, anxiety, or horror",
             "Dissonant chords or unsettling tones",
-            "Slow builds or sudden climaxes"
-        ]
+            "Slow builds or sudden climaxes",
+        ],
     },
     "Malice": {
         "display": "Malice (Choleric)",
@@ -56,9 +56,9 @@ TEMPERAMENTS = {
             "Heavy drums and distorted instruments",
             "Themes of anger, rebellion, or conflict",
             "Fast tempos and powerful vocals",
-            "Confrontational or rebellious lyrics"
-        ]
-    }
+            "Confrontational or rebellious lyrics",
+        ],
+    },
 }
 
 # ==================== SYSTEM PROMPTS ====================
@@ -100,10 +100,11 @@ Use the track classifications as supporting evidence, but also consider the play
 
 # ==================== USER PROMPTS ====================
 
+
 def get_track_classification_prompt(track_metadata: str) -> str:
     """Generate prompt for classifying a single track"""
     logger.info("Generating track classification prompt")
-    
+
     prompt = f"""Analyze the following music track and classify it into ONE of these four temperament categories:
 
 1. **Woe (Melancholic)** - Sadness, melancholy, sorrow, despair, loneliness, introspection
@@ -129,14 +130,16 @@ Respond in JSON format:
     "confidence": 0.0-1.0,
     "reasoning": "Explain why you classified this track as [temperament]"
 }}"""
-    
+
     return prompt
 
 
-def get_playlist_classification_prompt(playlist_metadata: str, track_summary: str, sample_tracks: str) -> str:
+def get_playlist_classification_prompt(
+    playlist_metadata: str, track_summary: str, sample_tracks: str
+) -> str:
     """Generate prompt for classifying a playlist"""
     logger.info("Generating playlist classification prompt")
-    
+
     prompt = f"""Analyze this playlist and classify it into ONE of these four temperament categories:
 
 1. **Woe (Melancholic)** - Sadness, melancholy, sorrow, despair, loneliness, introspection
@@ -165,7 +168,7 @@ Respond in JSON format:
     "confidence": 0.0-1.0,
     "reasoning": "Explain why the playlist is primarily [temperament] based on the tracks and theme"
 }}"""
-    
+
     return prompt
 
 
@@ -178,6 +181,6 @@ def log_temperament_info():
         logger.info(f"\n{temp_info['emoji']} {temp_info['display']}")
         logger.info(f"   Description: {temp_info['description']}")
         logger.info(f"   Characteristics:")
-        for char in temp_info['characteristics']:
+        for char in temp_info["characteristics"]:
             logger.info(f"     - {char}")
     logger.info("=" * 60)

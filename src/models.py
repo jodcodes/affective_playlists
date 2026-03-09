@@ -13,12 +13,13 @@ consistency across the codebase.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
 
 class Temperament(Enum):
     """Four temperament categories from 4tempers feature."""
+
     WOE = "Woe (Melancholic)"
     FROLIC = "Frolic (Sanguine)"
     DREAD = "Dread (Phlegmatic)"
@@ -28,7 +29,7 @@ class Temperament(Enum):
 @dataclass
 class Track:
     """Represents a music track - used by all three features.
-    
+
     Attributes:
         track_id: Persistent ID from Music.app (hex format)
         name: Track title
@@ -38,6 +39,7 @@ class Track:
         year: Release year (optional)
         bpm: Beats per minute (optional)
     """
+
     track_id: str
     name: str
     artist: str
@@ -45,10 +47,10 @@ class Track:
     genre: Optional[str] = None
     year: Optional[int] = None
     bpm: Optional[int] = None
-    
+
     def get_metadata_string(self) -> str:
         """Return track metadata as a formatted string for LLM analysis.
-        
+
         Returns:
             String representation of track metadata
         """
@@ -62,32 +64,32 @@ class Track:
         if self.bpm:
             parts.append(f"BPM: {self.bpm}")
         return " | ".join(parts)
-    
+
     @staticmethod
     def from_dict(data: Dict[str, Any]) -> Track:
         """Create Track from dictionary (from Apple Music API).
-        
+
         Args:
             data: Dictionary with track metadata
-            
+
         Returns:
             Track instance
         """
         return Track(
-            track_id=data.get('persistent_id', data.get('id', '')),
-            name=data.get('name', ''),
-            artist=data.get('artist', ''),
-            album=data.get('album'),
-            genre=data.get('genre'),
-            year=data.get('year'),
-            bpm=data.get('bpm')
+            track_id=data.get("persistent_id", data.get("id", "")),
+            name=data.get("name", ""),
+            artist=data.get("artist", ""),
+            album=data.get("album"),
+            genre=data.get("genre"),
+            year=data.get("year"),
+            bpm=data.get("bpm"),
         )
 
 
 @dataclass
 class Playlist:
     """Represents a music playlist - used by all three features.
-    
+
     Attributes:
         playlist_id: Persistent ID from Music.app (hex format)
         name: Playlist name
@@ -96,21 +98,22 @@ class Playlist:
         description: Playlist description (optional)
         track_count: Number of tracks (cached for performance)
     """
+
     playlist_id: str
     name: str
     tracks: List[Track] = field(default_factory=list)
     folder_path: Optional[str] = None
     description: Optional[str] = None
     track_count: int = 0
-    
+
     def __post_init__(self):
         """Validate and set track_count after initialization."""
         if not self.track_count and self.tracks:
             self.track_count = len(self.tracks)
-    
+
     def get_metadata_string(self) -> str:
         """Return playlist metadata as a formatted string.
-        
+
         Returns:
             String representation of playlist metadata
         """
@@ -121,37 +124,38 @@ class Playlist:
             parts.append(f"Description: {self.description}")
         parts.append(f"Tracks: {self.track_count}")
         return " | ".join(parts)
-    
+
     @staticmethod
     def from_dict(data: Dict[str, Any], tracks: Optional[List[Track]] = None) -> Playlist:
         """Create Playlist from dictionary (from Apple Music API).
-        
+
         Args:
             data: Dictionary with playlist metadata
             tracks: Optional list of Track objects
-            
+
         Returns:
             Playlist instance
         """
         return Playlist(
-            playlist_id=data.get('persistent_id', data.get('id', '')),
-            name=data.get('name', ''),
+            playlist_id=data.get("persistent_id", data.get("id", "")),
+            name=data.get("name", ""),
             tracks=tracks or [],
-            folder_path=data.get('folder_path'),
-            description=data.get('description'),
-            track_count=data.get('track_count', len(tracks or []))
+            folder_path=data.get("folder_path"),
+            description=data.get("description"),
+            track_count=data.get("track_count", len(tracks or [])),
         )
 
 
 @dataclass
 class ClassificationResult:
     """Result of temperament classification (from 4tempers feature).
-    
+
     Attributes:
         temperament: Temperament category assigned
         confidence: Confidence score (0.0 to 1.0)
         reasoning: Explanation for the classification
     """
+
     temperament: Temperament
     confidence: float
     reasoning: str
@@ -160,13 +164,14 @@ class ClassificationResult:
 @dataclass
 class GenreClassificationResult:
     """Result of genre classification (from plsort feature).
-    
+
     Attributes:
         genre: Genre assigned (hip-hop, electronic, jazz, etc)
         confidence: Confidence score (0.0 to 1.0)
         method: Method used for classification
         scores: Dictionary of genre scores
     """
+
     genre: str
     confidence: float
     method: str
@@ -176,7 +181,7 @@ class GenreClassificationResult:
 @dataclass
 class MetadataEnrichmentResult:
     """Result of metadata enrichment operation (from metad_enr feature).
-    
+
     Attributes:
         success: Whether operation completed successfully
         track_id: ID of enriched track
@@ -184,6 +189,7 @@ class MetadataEnrichmentResult:
         source: Which API source provided the data
         error: Error message if operation failed
     """
+
     success: bool
     track_id: str
     fields_added: List[str] = field(default_factory=list)
@@ -194,7 +200,7 @@ class MetadataEnrichmentResult:
 @dataclass
 class OperationResult:
     """Unified result structure for all features.
-    
+
     Attributes:
         success: Overall success of operation
         target: Playlist or folder name that was processed
@@ -205,6 +211,7 @@ class OperationResult:
         errors: Count of items with errors
         details: Additional operation-specific details
     """
+
     success: bool
     target: str
     operation_type: str  # 'temperament', 'enrich', 'organize'
@@ -213,20 +220,20 @@ class OperationResult:
     skipped: int = 0
     errors: int = 0
     details: Dict[str, Any] = field(default_factory=dict)
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert result to dictionary for JSON serialization.
-        
+
         Returns:
             Dictionary representation of result
         """
         return {
-            'success': self.success,
-            'target': self.target,
-            'operation_type': self.operation_type,
-            'processed': self.processed,
-            'enriched': self.enriched,
-            'skipped': self.skipped,
-            'errors': self.errors,
-            'details': self.details
+            "success": self.success,
+            "target": self.target,
+            "operation_type": self.operation_type,
+            "processed": self.processed,
+            "enriched": self.enriched,
+            "skipped": self.skipped,
+            "errors": self.errors,
+            "details": self.details,
         }

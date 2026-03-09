@@ -1,16 +1,16 @@
-# affective_playlists 🎵
+# affective_playlists
 
 **Unified suite for music analysis and organization**
 
 A powerful, single-command music tool that combines three complementary features into one streamlined application for Apple Music.
 
-## ✨ Features
+## Features
 
-- 🎭 **Temperament Analysis** - AI-powered playlist emotion classification (Woe, Frolic, Dread, Malice)
-- 📝 **Metadata Enrichment** - Automatic metadata filling (BPM, Genre, Year, Cover Art) from multiple sources
-- 📚 **Playlist Organization** - Intelligent genre-based playlist classification and organization
+- **Temperament Analysis** - AI-powered playlist emotion classification (Woe, Frolic, Dread, Malice)
+- **Metadata Enrichment** - Automatic metadata filling (BPM, Genre, Year, Cover Art) from multiple sources
+- **Playlist Organization** - Intelligent genre-based playlist classification and organization
 
-## ⚡ Quick Start (One Command)
+## Quick Start (One Command)
 
 ### Installation
 
@@ -23,12 +23,12 @@ bash install.sh
 ```
 
 That's it! The script will:
-- ✓ Check Python version (3.10+)
-- ✓ Create virtual environment
-- ✓ Install all dependencies
-- ✓ Install CLI commands
-- ✓ Run tests
-- ✓ Set up configuration directories
+- Check Python version (3.10+)
+- Create virtual environment
+- Install all dependencies
+- Install CLI commands
+- Run tests
+- Set up configuration directories
 
 ### First Time Setup
 
@@ -57,7 +57,7 @@ That's it! The script will:
    affective-playlists
    ```
 
-## 🎯 Usage
+## Usage
 
 ### Interactive Menu (Recommended)
 ```bash
@@ -65,9 +65,9 @@ affective-playlists
 ```
 
 Choose from:
-1. 🎭 **Temperament Analysis** - AI-based emotion classification
-2. 📝 **Metadata Enrichment** - Fill missing audio metadata
-3. 📚 **Playlist Organization** - Genre-based sorting
+1. **Temperament Analysis** - AI-based emotion classification
+2. **Metadata Enrichment** - Fill missing audio metadata
+3. **Playlist Organization** - Genre-based sorting
 
 ### Command Line
 
@@ -94,7 +94,7 @@ affective-playlists --version
 affective-playlists -v
 ```
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 affective_playlists/
@@ -109,9 +109,9 @@ affective_playlists/
 ├── .env.example            ← Environment template
 │
 ├── src/                    ← All source code
-│   ├── temperament_analyzer.py     ← 4tempers
-│   ├── metadata_fill.py             ← metad_enr
-│   ├── plsort.py                    ← Playlist organization
+│   ├── temperament_analyzer.py     ← Temperament Analysis
+│   ├── metadata_fill.py             ← Metadata Enrichment
+│   ├── plsort.py                    ← Playlist Organization
 │   ├── apple_music.py               ← Shared Apple Music interface
 │   ├── config.py                    ← Config management
 │   ├── logger.py                    ← Logging
@@ -124,8 +124,12 @@ affective_playlists/
 │
 ├── docs/                   ← Documentation
 │   ├── rules/             ← Development standards
-│   ├── requirements/      ← Feature specifications
-│   └── summary/           ← Reports and guides
+│   ├── domain-guides/     ← Feature domain specifications
+│   └── project-management/← Project tracking docs
+│
+├── openspec/               ← OpenSpec specification framework
+│   ├── specs/             ← Domain specifications
+│   └── changes/           ← Change packages
 │
 ├── data/                   ← Centralized data
 │   ├── config/            ← Configuration files
@@ -135,38 +139,41 @@ affective_playlists/
 └── venv/                   ← Virtual environment (created by install.sh)
 ```
 
-## 🔧 System Requirements
+## System Requirements
 
 - **OS**: macOS 10.13+ (for Apple Music integration)
 - **Python**: 3.10 or higher
 - **Dependencies**: Automatically installed by `install.sh`
 
-## 🎯 Features Overview
+## Features Overview
 
-### 1. Temperament Analysis (4tempers)
+### 1. Temperament Analysis
+
 Classifies playlists into emotional categories using AI:
-- 🌧️ **Woe** (Melancholic) - Sadness, loneliness, introspection
-- ☀️ **Frolic** (Sanguine) - Joy, celebration, energy
-- 😰 **Dread** (Phlegmatic) - Fear, tension, anxiety
-- 🔥 **Malice** (Choleric) - Rage, aggression, intensity
+- **Woe** (Melancholic) - Sadness, loneliness, introspection
+- **Frolic** (Sanguine) - Joy, celebration, energy
+- **Dread** (Phlegmatic) - Fear, tension, anxiety
+- **Malice** (Choleric) - Rage, aggression, intensity
 
 Uses OpenAI GPT for intelligent classification.
 
-### 2. Metadata Enrichment (metad_enr)
+### 2. Metadata Enrichment
+
 Automatically fills missing metadata using multiple sources:
 - **Sources**: MusicBrainz, AcousticBrainz, Discogs, Wikidata, Last.fm
 - **Fields**: BPM, Genre, Release Year, Cover Art
 - **Strategy**: Per-field enrichment (stops searching once field is found)
 - **Smart**: ~50% fewer API calls than traditional approaches
 
-### 3. Playlist Organization (plsort)
+### 3. Playlist Organization
+
 Intelligently organizes playlists by genre:
 - Hip-Hop, Electronic, Disco/Funk/Soul, Jazz, World, Rock
 - Genre detection via track metadata
 - One-command organization
 - Undo support
 
-## 🧪 Testing
+## Testing
 
 The installation script runs the full test suite (136+ tests). To run manually:
 
@@ -182,18 +189,18 @@ Test categories:
 - API mocking
 - Edge case coverage
 
-## 📊 Code Quality
+## Code Quality
 
 All code follows professional Python standards:
-- ✓ Type hints on all functions
-- ✓ Comprehensive docstrings (Google style)
-- ✓ Specific exception handling
-- ✓ Centralized logging
-- ✓ Proper code organization
+- Type hints on all functions
+- Comprehensive docstrings (Google style)
+- Specific exception handling
+- Centralized logging
+- Proper code organization
 
 See [docs/rules/CODE_QUALITY_STANDARDS.md](docs/rules/CODE_QUALITY_STANDARDS.md) for details.
 
-## 🚀 Development
+## Development
 
 ### Setup for Development
 ```bash
@@ -221,13 +228,14 @@ pytest tests/test_metadata_fill.py::TestMetadataFiller -v
 ```
 
 ### Spec-Driven Workflow (Brownfield)
-The repository now includes a brownfield spec-driven scaffold:
 
-- `AGENTS.md` - agent workflow and quality gates
+The repository uses a brownfield spec-driven development approach:
+
+- `AGENTS.md` - Agent workflow and quality gates
 - `openspec/config.yaml` - OpenSpec project configuration
-- `openspec/specs/` - seeded domain specifications
-- `fix_plan.md` - prioritized execution plan
-- `spec_debt.md` - behavior not yet fully specified
+- `openspec/specs/` - Seeded domain specifications
+- `docs/project-management/fix_plan.md` - Prioritized execution plan
+- `docs/project-management/spec_debt.md` - Behavior not yet fully specified
 
 Recommended OpenSpec cycle for changes:
 
@@ -237,7 +245,7 @@ openspec verify
 openspec archive <change-name>
 ```
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Installation Issues
 
@@ -288,43 +296,38 @@ OPENAI_API_KEY=sk-your-actual-key
 - Metadata enrichment queues requests automatically
 - Wait a few minutes and retry
 
-## 📚 Documentation
+## Documentation
 
 - **[QUICKSTART.md](QUICKSTART.md)** - Quick reference guide
 - **[docs/INSTALLATION.md](docs/INSTALLATION.md)** - Detailed installation
 - **[docs/OVERVIEW.md](docs/OVERVIEW.md)** - Architecture overview
-- **[docs/requirements/](docs/requirements/)** - Feature specifications
+- **[docs/domain-guides/](docs/domain-guides/)** - Feature domain specifications
 - **[docs/rules/](docs/rules/)** - Development standards
+- **[openspec/specs/](openspec/specs/)** - OpenSpec specifications
 
-## 🤝 Contributing
+## Contributing
 
 1. Clone the repository
 2. Run `bash install.sh`
 3. Follow [CODE_QUALITY_STANDARDS.md](docs/rules/CODE_QUALITY_STANDARDS.md)
 4. Run tests before submitting PRs: `pytest tests/ -v`
 
-## 📝 License
+## License
 
 MIT License - See [LICENSE](LICENSE) for details
 
-## 🙋 Support
+## Support
 
 Having issues?
 
-1. **Check the docs**: Start with relevant doc in `docs/`
-2. **Check the logs**: View `data/logs/` or `temperament_analyzer.log`
-3. **Verify configuration**: Review `.env` and `data/config/`
-4. **Run with verbose mode**: `affective-playlists -v`
-5. **Run tests**: `pytest tests/ -v`
-
-## 🎵 Made for Apple Music Lovers
-
-This tool is specifically designed for Apple Music, providing seamless integration and comprehensive music management features.
+1. Check the relevant docs in `docs/`
+2. View logs in `data/logs/` or `temperament_analyzer.log`
+3. Review configuration in `.env` and `data/config/`
+4. Run with verbose mode: `affective-playlists -v`
+5. Run tests: `pytest tests/ -v`
 
 ---
 
 **Version**: 1.0.0  
 **Last Updated**: January 4, 2026  
-**Status**: Production Ready ✓
-
-**Happy analyzing! 🎵**
+**Status**: Production Ready

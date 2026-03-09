@@ -10,11 +10,11 @@ Supports multiple formats:
 No external dependencies - uses stdlib only with format-specific parsing.
 """
 
+import logging
 import os
 import struct
-import logging
-from typing import Dict, Optional
 from abc import ABC, abstractmethod
+from typing import Dict, Optional
 
 
 class AudioTagHandler(ABC):
@@ -45,38 +45,38 @@ class MP3TagHandler(AudioTagHandler):
 
     # ID3v2 tag frame identifiers
     FRAME_MAPPING = {
-        'bpm': 'TBPM',  # Beats per minute
-        'genre': 'TCON',  # Content type (genre)
-        'year': 'TDRC',  # Recording date
-        'artist': 'TPE1',  # Lead artist/performer
-        'title': 'TIT2',  # Title
-        'album': 'TALB',  # Album title
+        "bpm": "TBPM",  # Beats per minute
+        "genre": "TCON",  # Content type (genre)
+        "year": "TDRC",  # Recording date
+        "artist": "TPE1",  # Lead artist/performer
+        "title": "TIT2",  # Title
+        "album": "TALB",  # Album title
     }
 
     def supports_format(self) -> bool:
         """Check if file is MP3."""
-        return self.filepath.lower().endswith('.mp3')
+        return self.filepath.lower().endswith(".mp3")
 
     def read_tags(self) -> Dict[str, str]:
         """
         Read ID3v2 tags from MP3 file.
-        
+
         Returns: {field: value} dict
         """
         tags = {}
 
         try:
-            with open(self.filepath, 'rb') as f:
+            with open(self.filepath, "rb") as f:
                 # Check for ID3v2 header
                 header = f.read(3)
-                if header != b'ID3':
+                if header != b"ID3":
                     self.logger.debug(f"No ID3v2 tag in {self.filepath}")
                     return tags
 
                 # Parse ID3v2 header (simplified - full spec is more complex)
                 version = f.read(2)
                 flags = f.read(1)
-                
+
                 # Read tag size (synchsafe integer)
                 size_bytes = f.read(4)
                 tag_size = self._synchsafe_int(size_bytes)
@@ -89,22 +89,22 @@ class MP3TagHandler(AudioTagHandler):
                     if not frame_header or len(frame_header) < 10:
                         break
 
-                    frame_id = frame_header[:4].decode('latin-1', errors='ignore')
+                    frame_id = frame_header[:4].decode("latin-1", errors="ignore")
                     frame_size_bytes = frame_header[4:8]
-                    frame_size = struct.unpack('>I', frame_size_bytes)[0]
+                    frame_size = struct.unpack(">I", frame_size_bytes)[0]
 
                     if frame_size == 0 or frame_size > remaining:
                         break
 
                     # Read frame data
                     frame_data = f.read(frame_size)
-                    remaining -= (10 + frame_size)
+                    remaining -= 10 + frame_size
 
                     # Parse text frames
-                    if frame_id.startswith('T') and frame_id != 'TXXX':
+                    if frame_id.startswith("T") and frame_id != "TXXX":
                         # Skip encoding byte
-                        text = frame_data[1:].decode('utf-8', errors='ignore').rstrip('\x00')
-                        
+                        text = frame_data[1:].decode("utf-8", errors="ignore").rstrip("\x00")
+
                         # Map to standard field names
                         for field, fid in self.FRAME_MAPPING.items():
                             if frame_id == fid:
@@ -119,13 +119,13 @@ class MP3TagHandler(AudioTagHandler):
     def write_tags(self, tags: Dict[str, str], overwrite: bool = False) -> bool:
         """
         Write ID3v2 tags to MP3 file.
-        
+
         Note: Simplified implementation. Production code should use dedicated library.
-        
+
         Args:
             tags: {field: value} dict
             overwrite: Whether to overwrite existing tags
-            
+
         Returns:
             True if successful
         """
@@ -149,31 +149,31 @@ class FLACTagHandler(AudioTagHandler):
 
     # Vorbis comment field mapping
     FIELD_MAPPING = {
-        'bpm': 'BPM',
-        'genre': 'GENRE',
-        'year': 'DATE',
-        'artist': 'ARTIST',
-        'title': 'TITLE',
-        'album': 'ALBUM',
+        "bpm": "BPM",
+        "genre": "GENRE",
+        "year": "DATE",
+        "artist": "ARTIST",
+        "title": "TITLE",
+        "album": "ALBUM",
     }
 
     def supports_format(self) -> bool:
         """Check if file is FLAC."""
-        return self.filepath.lower().endswith('.flac')
+        return self.filepath.lower().endswith(".flac")
 
     def read_tags(self) -> Dict[str, str]:
         """
         Read Vorbis comments from FLAC file.
-        
+
         Returns: {field: value} dict
         """
         tags = {}
 
         try:
-            with open(self.filepath, 'rb') as f:
+            with open(self.filepath, "rb") as f:
                 # Check FLAC header
                 header = f.read(4)
-                if header != b'fLaC':
+                if header != b"fLaC":
                     self.logger.debug(f"Not a valid FLAC file: {self.filepath}")
                     return tags
 
@@ -185,7 +185,7 @@ class FLACTagHandler(AudioTagHandler):
 
                     is_last = bool(block_header[0] & 0x80)
                     block_type = block_header[0] & 0x7F
-                    block_size = struct.unpack('>I', b'\x00' + block_header[1:4])[0]
+                    block_size = struct.unpack(">I", b"\x00" + block_header[1:4])[0]
 
                     if block_type == 4:  # Vorbis comment block
                         block_data = f.read(block_size)
@@ -205,13 +205,13 @@ class FLACTagHandler(AudioTagHandler):
     def write_tags(self, tags: Dict[str, str], overwrite: bool = False) -> bool:
         """
         Write Vorbis comments to FLAC file.
-        
+
         Note: Simplified implementation.
-        
+
         Args:
             tags: {field: value} dict
             overwrite: Whether to overwrite existing tags
-            
+
         Returns:
             True if successful
         """
@@ -225,34 +225,34 @@ class FLACTagHandler(AudioTagHandler):
     def _parse_vorbis_comments(self, data: bytes) -> Dict[str, str]:
         """Parse Vorbis comment block data."""
         tags = {}
-        
+
         try:
             offset = 4  # Skip vendor string length
-            vendor_len = struct.unpack('<I', data[0:4])[0]
+            vendor_len = struct.unpack("<I", data[0:4])[0]
             offset += vendor_len
 
             # Number of comments
-            num_comments = struct.unpack('<I', data[offset:offset+4])[0]
+            num_comments = struct.unpack("<I", data[offset : offset + 4])[0]
             offset += 4
 
             for _ in range(num_comments):
                 if offset + 4 > len(data):
                     break
 
-                comment_len = struct.unpack('<I', data[offset:offset+4])[0]
+                comment_len = struct.unpack("<I", data[offset : offset + 4])[0]
                 offset += 4
 
                 if offset + comment_len > len(data):
                     break
 
-                comment = data[offset:offset+comment_len].decode('utf-8', errors='ignore')
+                comment = data[offset : offset + comment_len].decode("utf-8", errors="ignore")
                 offset += comment_len
 
                 # Parse field=value
-                if '=' in comment:
-                    field, value = comment.split('=', 1)
+                if "=" in comment:
+                    field, value = comment.split("=", 1)
                     field_lower = field.lower()
-                    
+
                     # Map Vorbis fields to standard names
                     for std_field, vorbis_field in self.FIELD_MAPPING.items():
                         if field_lower == vorbis_field.lower():
@@ -269,17 +269,17 @@ class OGGTagHandler(AudioTagHandler):
     """Handler for OGG/Vorbis files (same as FLAC Vorbis comments)."""
 
     FIELD_MAPPING = {
-        'bpm': 'BPM',
-        'genre': 'GENRE',
-        'year': 'DATE',
-        'artist': 'ARTIST',
-        'title': 'TITLE',
-        'album': 'ALBUM',
+        "bpm": "BPM",
+        "genre": "GENRE",
+        "year": "DATE",
+        "artist": "ARTIST",
+        "title": "TITLE",
+        "album": "ALBUM",
     }
 
     def supports_format(self) -> bool:
         """Check if file is OGG."""
-        return self.filepath.lower().endswith(('.ogg', '.oga'))
+        return self.filepath.lower().endswith((".ogg", ".oga"))
 
     def read_tags(self) -> Dict[str, str]:
         """Read Vorbis comments from OGG file."""
@@ -303,22 +303,22 @@ class M4ATagHandler(AudioTagHandler):
 
     # iTunes atom mapping (using escaped unicode for © symbol)
     ATOM_MAPPING = {
-        'bpm': 'tmpo',  # BPM
-        'genre': '\xa9gen',  # Genre (© = \xa9)
-        'year': '\xa9day',  # Release date
-        'artist': '\xa9ART',  # Artist
-        'title': '\xa9nam',  # Title
-        'album': '\xa9alb',  # Album
+        "bpm": "tmpo",  # BPM
+        "genre": "\xa9gen",  # Genre (© = \xa9)
+        "year": "\xa9day",  # Release date
+        "artist": "\xa9ART",  # Artist
+        "title": "\xa9nam",  # Title
+        "album": "\xa9alb",  # Album
     }
 
     def supports_format(self) -> bool:
         """Check if file is M4A."""
-        return self.filepath.lower().endswith(('.m4a', '.m4b'))
+        return self.filepath.lower().endswith((".m4a", ".m4b"))
 
     def read_tags(self) -> Dict[str, str]:
         """
         Read iTunes atoms from M4A file.
-        
+
         Returns: {field: value} dict
         """
         tags = {}
@@ -345,10 +345,10 @@ class AudioTagFactory:
     def create_handler(filepath: str) -> Optional[AudioTagHandler]:
         """
         Create appropriate tag handler for file.
-        
+
         Args:
             filepath: Path to audio file
-            
+
         Returns:
             AudioTagHandler instance or None if format not supported
         """
@@ -362,7 +362,7 @@ class AudioTagFactory:
     @staticmethod
     def get_supported_formats() -> list:
         """Get list of supported file extensions."""
-        return ['.mp3', '.flac', '.ogg', '.oga', '.m4a', '.m4b']
+        return [".mp3", ".flac", ".ogg", ".oga", ".m4a", ".m4b"]
 
 
 class TagManager:
@@ -374,10 +374,10 @@ class TagManager:
     def read_tags(self, filepath: str) -> Dict[str, str]:
         """
         Read tags from audio file.
-        
+
         Args:
             filepath: Path to audio file
-            
+
         Returns:
             {field: value} dict or empty dict if read fails
         """
@@ -388,16 +388,15 @@ class TagManager:
 
         return handler.read_tags()
 
-    def write_tags(self, filepath: str, tags: Dict[str, str],
-                  overwrite: bool = False) -> bool:
+    def write_tags(self, filepath: str, tags: Dict[str, str], overwrite: bool = False) -> bool:
         """
         Write tags to audio file.
-        
+
         Args:
             filepath: Path to audio file
             tags: {field: value} dict
             overwrite: Whether to overwrite existing tags
-            
+
         Returns:
             True if successful
         """

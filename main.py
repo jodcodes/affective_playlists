@@ -18,17 +18,12 @@ Usage:
 import sys
 import os
 import argparse
-from pathlib import Path
 
-# Add src to path
-PROJECT_ROOT = Path(__file__).parent
-sys.path.insert(0, str(PROJECT_ROOT / "src"))
-
-from logger import setup_logger
-from apple_music import AppleMusicInterface
-from normalizer import TextNormalizer
-from config import load_centralized_whitelist
-from cli_ui import (
+from src.logger import setup_logger
+from src.apple_music import AppleMusicInterface
+from src.normalizer import TextNormalizer
+from src.config import load_centralized_whitelist
+from src.cli_ui import (
     print_header, print_footer, success, error, warning, info,
     Menu, Box, Icon, Color, bold
 )
@@ -42,21 +37,21 @@ metadata_fill = None
 plsort_module = None
 
 try:
-    from temperament_analyzer import TemperamentAnalyzer, MusicAppClient, OpenAILLMClient
-    temperament_analyzer = sys.modules.get('temperament_analyzer')
+    from src.temperament_analyzer import TemperamentAnalyzer, MusicAppClient, OpenAILLMClient
+    temperament_analyzer = sys.modules.get('src.temperament_analyzer')
 except ImportError as e:
     logger.warning(f"Could not import temperament_analyzer: {e}")
 
 try:
-    from metadata_fill import MetadataFillCLI
-    metadata_fill = sys.modules.get('metadata_fill')
+    from src.metadata_fill import MetadataFillCLI
+    metadata_fill = sys.modules.get('src.metadata_fill')
 except ImportError as e:
     logger.warning(f"Could not import metadata_fill: {e}")
 except Exception as e:
     logger.error(f"Error importing metadata_fill: {e}")
 
 try:
-    import plsort as plsort_module
+    import src.plsort as plsort_module
 except ImportError as e:
     logger.warning(f"Could not import plsort: {e}")
 

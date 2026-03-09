@@ -48,6 +48,11 @@ wheels/
 logs/
 *.log
 
+# Tool outputs
+*_output*.txt
+mypy_output*.txt
+pylint_output*.txt
+
 # Data and cache
 cache/
 *.db
@@ -67,6 +72,10 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+
+# OpenSpec (work-in-progress changes)
+openspec/changes/*/
+!openspec/changes/.gitkeep
 
 # Test artifacts
 .pytest_cache/

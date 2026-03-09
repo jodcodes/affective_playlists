@@ -5,10 +5,11 @@ Tests the require_macos() function to ensure platform constraints
 are properly enforced.
 """
 
-import pytest
 import sys
-from unittest.mock import patch, MagicMock
 from io import StringIO
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 class TestRequireMacOS:
@@ -19,6 +20,7 @@ class TestRequireMacOS:
         with patch("sys.platform", "darwin"):
             # Import inside patch to get the mocked platform
             import main
+
             result = main.require_macos("Test Feature")
             assert result is True
 
@@ -27,7 +29,9 @@ class TestRequireMacOS:
         with patch("sys.platform", "linux"):
             # Reload to get fresh platform check
             import importlib
+
             import main
+
             importlib.reload(main)
             result = main.require_macos("Test Feature")
             assert result is False
@@ -36,12 +40,14 @@ class TestRequireMacOS:
         """On non-macOS, require_macos should print error message."""
         with patch("sys.platform", "linux"):
             import importlib
+
             import main
+
             importlib.reload(main)
-            
+
             main.require_macos("Temperament Analysis")
             captured = capsys.readouterr()
-            
+
             # Check that error message was printed
             assert "Temperament Analysis" in captured.out
             assert "macOS" in captured.out
@@ -51,12 +57,14 @@ class TestRequireMacOS:
         """On non-macOS, require_macos should suggest alternative (folder enrichment)."""
         with patch("sys.platform", "linux"):
             import importlib
+
             import main
+
             importlib.reload(main)
-            
+
             main.require_macos("Playlist enrichment")
             captured = capsys.readouterr()
-            
+
             # Check for helpful tip
             assert "Folder" in captured.out or "folder" in captured.out.lower()
 
@@ -64,7 +72,9 @@ class TestRequireMacOS:
     def test_require_macos_on_windows_returns_false(self):
         """On Windows, require_macos should return False."""
         import importlib
+
         import main
+
         importlib.reload(main)
         result = main.require_macos("Test Feature")
         assert result is False

@@ -26,17 +26,18 @@ Key Classes:
 - TrackIdentifier: Track identification data (artist, title, duration)
 """
 
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
-from enum import Enum
 import json
-import os
-from datetime import datetime
 import logging
+import os
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import Dict, List, Optional, Tuple
 
 
 class MetadataField(Enum):
     """Metadata fields that can be enriched."""
+
     BPM = "bpm"
     GENRE = "genre"
     YEAR = "year"
@@ -46,6 +47,7 @@ class MetadataField(Enum):
 
 class DatabaseSource(Enum):
     """External music databases in priority order."""
+
     MUSICBRAINZ = 1
     ACOUSTICBRAINZ = 2
     DISCOGS = 3
@@ -56,6 +58,7 @@ class DatabaseSource(Enum):
 @dataclass
 class TrackIdentifier:
     """Identifier for a track (artist + title + duration)."""
+
     artist: str
     title: str
     duration_seconds: Optional[int] = None
@@ -63,10 +66,10 @@ class TrackIdentifier:
 
     def to_dict(self) -> dict:
         return {
-            'artist': self.artist,
-            'title': self.title,
-            'duration_seconds': self.duration_seconds,
-            'album': self.album
+            "artist": self.artist,
+            "title": self.title,
+            "duration_seconds": self.duration_seconds,
+            "album": self.album,
         }
 
     def is_complete(self) -> bool:
@@ -77,6 +80,7 @@ class TrackIdentifier:
 @dataclass
 class MetadataEntry:
     """Single metadata field with source tracking."""
+
     field: MetadataField
     value: str
     source: DatabaseSource
@@ -85,17 +89,18 @@ class MetadataEntry:
 
     def to_dict(self) -> dict:
         return {
-            'field': self.field.value,
-            'value': self.value,
-            'source': self.source.name,
-            'confidence': self.confidence,
-            'timestamp': self.timestamp
+            "field": self.field.value,
+            "value": self.value,
+            "source": self.source.name,
+            "confidence": self.confidence,
+            "timestamp": self.timestamp,
         }
 
 
 @dataclass
 class EnrichedMetadata:
     """Complete enriched metadata for a track."""
+
     track_id: TrackIdentifier
     filepath: str
     entries: Dict[MetadataField, MetadataEntry] = field(default_factory=dict)
@@ -117,25 +122,21 @@ class EnrichedMetadata:
 
     def to_dict(self) -> dict:
         return {
-            'track_id': self.track_id.to_dict(),
-            'filepath': self.filepath,
-            'enriched_fields': {
-                k.value: v.to_dict() for k, v in self.entries.items()
-            },
-            'skipped_fields': {
-                k.value: v for k, v in self.skipped_fields.items()
-            },
-            'existing_metadata': self.existing_metadata
+            "track_id": self.track_id.to_dict(),
+            "filepath": self.filepath,
+            "enriched_fields": {k.value: v.to_dict() for k, v in self.entries.items()},
+            "skipped_fields": {k.value: v for k, v in self.skipped_fields.items()},
+            "existing_metadata": self.existing_metadata,
         }
 
 
 class DownloadedTrackDetector:
     """Detect downloaded (local) tracks vs cloud-only tracks."""
 
-    def __init__(self, library_paths: List[str] = None):
+    def __init__(self, library_paths: Optional[List[str]] = None):
         """
         Initialize detector with local library paths.
-        
+
         Args:
             library_paths: Paths to local music libraries
                           (e.g., ~/Music/Music Library.musiclibrary)
@@ -146,7 +147,7 @@ class DownloadedTrackDetector:
     def _get_default_paths(self) -> List[str]:
         """Get default local music library paths."""
         paths = []
-        
+
         # macOS Music app library
         home = os.path.expanduser("~")
         music_lib = os.path.join(home, "Music", "Music Media")
@@ -164,10 +165,10 @@ class DownloadedTrackDetector:
     def is_downloaded(self, filepath: Optional[str]) -> bool:
         """
         Determine if a track is downloaded (local file exists).
-        
+
         Args:
             filepath: Absolute path to audio file
-            
+
         Returns:
             True if file exists locally and is readable
         """
@@ -175,10 +176,10 @@ class DownloadedTrackDetector:
             return False
 
         expanded_path = os.path.expanduser(filepath)
-        
+
         # Check if file exists and is readable
         is_local = os.path.exists(expanded_path) and os.path.isfile(expanded_path)
-        
+
         if is_local and not os.access(expanded_path, os.R_OK):
             self.logger.warning(f"File exists but not readable: {filepath}")
             return False
@@ -188,10 +189,10 @@ class DownloadedTrackDetector:
     def is_in_library(self, filepath: Optional[str]) -> bool:
         """
         Check if file is within a known local library path.
-        
+
         Args:
             filepath: Absolute path to audio file
-            
+
         Returns:
             True if file is in one of the configured library paths
         """
@@ -211,7 +212,7 @@ class DownloadedTrackDetector:
 
     def get_supported_formats(self) -> List[str]:
         """Get list of supported audio file formats."""
-        return ['.mp3', '.flac', '.ogg', '.m4a', '.aiff', '.wav']
+        return [".mp3", ".flac", ".ogg", ".m4a", ".aiff", ".wav"]
 
     def is_audio_file(self, filepath: str) -> bool:
         """Check if file is a supported audio format."""
@@ -224,20 +225,21 @@ class MetadataRequirements:
 
     # These fields must be present for enrichment to work
     # (They're used for database matching, not enriched)
-    CRITICAL_FIELDS_RAW = {'artist', 'title'}
+    CRITICAL_FIELDS_RAW = {"artist", "title"}
 
     ENRICHABLE_FIELDS = {
         MetadataField.BPM: "Beats per minute (preferably from AcousticBrainz)",
         MetadataField.GENRE: "Genre classification (from multiple sources)",
         MetadataField.YEAR: "Release year (from MusicBrainz/Discogs/Wikidata)",
-        MetadataField.COMPOSER: "Composer/Songwriter information"
+        MetadataField.COMPOSER: "Composer/Songwriter information",
     }
 
-    def check_metadata_completeness(self, metadata: Dict[str, str]) \
-            -> Tuple[List[MetadataField], List[MetadataField]]:
+    def check_metadata_completeness(
+        self, metadata: Dict[str, str]
+    ) -> Tuple[List[MetadataField], List[MetadataField]]:
         """
         Check which fields are present and which are missing.
-        
+
         Returns:
             (complete_fields, missing_fields)
         """
@@ -255,15 +257,16 @@ class MetadataRequirements:
 
         return complete, missing
 
-    def should_enrich(self, missing_fields: List[MetadataField],
-                     skip_complete: bool = True) -> bool:
+    def should_enrich(
+        self, missing_fields: List[MetadataField], skip_complete: bool = True
+    ) -> bool:
         """
         Determine if enrichment is worthwhile.
-        
+
         Args:
             missing_fields: Fields that are missing/incomplete
             skip_complete: Skip if all enrichable fields present
-            
+
         Returns:
             True if enrichment should proceed
         """
@@ -271,7 +274,7 @@ class MetadataRequirements:
             return False
 
         enrichable_missing = [f for f in missing_fields if f in self.ENRICHABLE_FIELDS]
-        
+
         return bool(enrichable_missing)
 
 
@@ -284,18 +287,22 @@ class MetadataEnricher:
         self.requirements = MetadataRequirements()
         self.enrichment_history: List[EnrichedMetadata] = []
 
-    def enrich_track(self, filepath: str, existing_metadata: Dict[str, str],
-                    track_id: TrackIdentifier, force: bool = False) \
-            -> EnrichedMetadata:
+    def enrich_track(
+        self,
+        filepath: str,
+        existing_metadata: Dict[str, str],
+        track_id: TrackIdentifier,
+        force: bool = False,
+    ) -> EnrichedMetadata:
         """
         Enrich metadata for a single downloaded track.
-        
+
         Args:
             filepath: Path to audio file
             existing_metadata: Current metadata from file
             track_id: Artist+Title+Duration identifier
             force: Overwrite existing metadata without confirmation
-            
+
         Returns:
             EnrichedMetadata object with enriched fields
         """
@@ -310,11 +317,9 @@ class MetadataEnricher:
 
         # Check completeness
         complete, missing = self.requirements.check_metadata_completeness(existing_metadata)
-        
+
         enriched = EnrichedMetadata(
-            track_id=track_id,
-            filepath=filepath,
-            existing_metadata=existing_metadata.copy()
+            track_id=track_id, filepath=filepath, existing_metadata=existing_metadata.copy()
         )
 
         # Skip if all enrichable fields present and not forcing
@@ -332,15 +337,16 @@ class MetadataEnricher:
         # Return enriched metadata (actual database queries handled separately)
         return enriched
 
-    def enrich_batch(self, tracks: List[Tuple[str, Dict, TrackIdentifier]],
-                    force: bool = False) -> List[EnrichedMetadata]:
+    def enrich_batch(
+        self, tracks: List[Tuple[str, Dict, TrackIdentifier]], force: bool = False
+    ) -> List[EnrichedMetadata]:
         """
         Enrich metadata for multiple tracks.
-        
+
         Args:
             tracks: List of (filepath, metadata, track_id) tuples
             force: Overwrite existing metadata
-            
+
         Returns:
             List of EnrichedMetadata objects
         """
@@ -366,24 +372,24 @@ class MetadataEnricher:
                 fields_enriched[field.value] += 1
 
         return {
-            'total_tracks': total,
-            'enriched_tracks': enriched,
-            'skipped_tracks': skipped,
-            'fields_enriched': fields_enriched
+            "total_tracks": total,
+            "enriched_tracks": enriched,
+            "skipped_tracks": skipped,
+            "fields_enriched": fields_enriched,
         }
 
     def export_results(self, output_file: str) -> bool:
         """Export enrichment results to JSON."""
         try:
             results = {
-                'timestamp': datetime.now().isoformat(),
-                'summary': self.get_enrichment_summary(),
-                'tracks': [e.to_dict() for e in self.enrichment_history]
+                "timestamp": datetime.now().isoformat(),
+                "summary": self.get_enrichment_summary(),
+                "tracks": [e.to_dict() for e in self.enrichment_history],
             }
-            
-            with open(output_file, 'w') as f:
+
+            with open(output_file, "w") as f:
                 json.dump(results, f, indent=2)
-            
+
             self.logger.info(f"Exported results to {output_file}")
             return True
         except Exception as e:

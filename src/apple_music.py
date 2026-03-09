@@ -9,11 +9,12 @@ NOTE: Whitelist filtering is handled by the calling code using shared.config mod
 This interface just returns all playlists; the caller decides which to process.
 """
 
-import subprocess
-import re
-from typing import List, Dict, Optional, Tuple
 import os
-from logger import setup_logger
+import re
+import subprocess
+from typing import Dict, List, Optional, Tuple
+
+from src.logger import setup_logger
 
 logger = setup_logger(__name__)
 
@@ -24,10 +25,10 @@ class AppleMusicInterface:
     def __init__(self, scripts_dir: str = "scripts"):
         """
         Initialize Apple Music interface.
-        
+
         Args:
             scripts_dir: Directory containing AppleScript templates
-        
+
         Note: Whitelist filtering is handled externally via shared.config module
         """
         self.scripts_dir = scripts_dir
@@ -35,23 +36,23 @@ class AppleMusicInterface:
     def _run_applescript(self, script: str) -> Tuple[bool, str]:
         """
         Run AppleScript and return result.
-        
+
         Returns:
             (success: bool, output: str)
         """
         try:
             process = subprocess.Popen(
-                ['osascript', '-'],
+                ["osascript", "-"],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True
+                text=True,
             )
             stdout, stderr = process.communicate(input=script)
-            
+
             if process.returncode != 0:
                 return False, stderr
-            
+
             return True, stdout.strip()
         except Exception as e:
             return False, str(e)
@@ -60,22 +61,21 @@ class AppleMusicInterface:
         """Load AppleScript template from file."""
         script_path = os.path.join(self.scripts_dir, f"{template_name}.applescript")
         try:
-            with open(script_path, 'r') as f:
+            with open(script_path, "r") as f:
                 return f.read()
         except FileNotFoundError:
             raise FileNotFoundError(f"AppleScript template not found: {script_path}")
 
-
     def get_playlist_names(self) -> Optional[List[str]]:
         """
         Get list of all playlist names AND folder names in Apple Music.
-        
+
         Includes both regular playlists and playlist folders.
-        
+
         Returns:
             List of playlist/folder names or empty list if failed
         """
-        script = '''
+        script = """
 tell application "Music"
     set itemNames to {}
     
@@ -95,11 +95,11 @@ tell application "Music"
     
     return itemNames
 end tell
-'''
+"""
         success, output = self._run_applescript(script)
         if not success:
             # Fallback: just get playlists
-            script_fallback = '''
+            script_fallback = """
 tell application "Music"
     set playlistNames to {}
     repeat with pl in playlists
@@ -107,7 +107,7 @@ tell application "Music"
     end repeat
     return playlistNames
 end tell
-'''
+"""
             success, output = self._run_applescript(script_fallback)
             if not success:
                 return []
@@ -118,14 +118,14 @@ end tell
 
         # Simple split on comma and clean up
         playlist_names = [name.strip() for name in output.split(",")]
-        
+
         # Return all playlists without filtering
         # (whitelist filtering is handled by the caller via shared.config module)
         return playlist_names
 
     def is_folder(self, item_name: str) -> bool:
         """Check if an item is a folder (True) or playlist (False)."""
-        script = f'''
+        script = f"""
 tell application "Music"
     try
         set targetFolder to folder "{item_name}"
@@ -134,37 +134,37 @@ tell application "Music"
         return false
     end try
 end tell
-'''
+"""
         success, output = self._run_applescript(script)
         return success and "true" in output.lower()
 
     def get_playlist_tracks(self, playlist_name: str) -> Optional[List[Dict]]:
         """
         Get all tracks from a playlist or folder with metadata.
-        
+
         Automatically detects if item is a folder or playlist and gets tracks accordingly.
-        
+
         Returns:
             List of track metadata dicts or empty list if failed
         """
         # Try both approaches: regular playlist first, then as folder
-        
+
         # Approach 1: Try as regular playlist
         tracks = self._get_regular_playlist_tracks(playlist_name)
         if tracks:
             return tracks
-        
+
         # Approach 2: Try as folder
         tracks = self._get_folder_all_tracks(playlist_name)
         if tracks:
             return tracks
-        
+
         # If both failed
         return []
 
     def _get_regular_playlist_tracks(self, playlist_name: str) -> Optional[List[Dict]]:
         """Get tracks from a regular (non-folder) playlist."""
-        script = f'''
+        script = f"""
 tell application "Music"
     set trackList to {{}}
     
@@ -190,7 +190,7 @@ tell application "Music"
         return {{}}
     end try
 end tell
-'''
+"""
         success, output = self._run_applescript(script)
         if not success or not output:
             return None
@@ -203,7 +203,7 @@ end tell
         Get all tracks from all playlists within a folder.
         """
         # Step 1: Get list of playlists in the folder
-        script = f'''
+        script = f"""
 tell application "Music"
     set playlistNames to {{}}
     try
@@ -219,14 +219,14 @@ tell application "Music"
     end try
     return playlistNames
 end tell
-'''
+"""
         success, output = self._run_applescript(script)
         if not success or not output:
             return None
 
         # Parse playlist names
         playlist_names = [name.strip() for name in output.split(",") if name.strip()]
-        
+
         if not playlist_names:
             return None
 
@@ -242,12 +242,12 @@ end tell
     def create_playlist_folder(self, folder_name: str, parent_folder: Optional[str] = None) -> bool:
         """
         Create a playlist folder in Apple Music.
-        
+
         Returns:
             True if successful, False otherwise
         """
         if parent_folder:
-            script = f'''
+            script = f"""
 tell application "Music"
     try
         make new folder in folder "{parent_folder}" with properties {{name:"{folder_name}"}}
@@ -256,9 +256,9 @@ tell application "Music"
         return false
     end try
 end tell
-'''
+"""
         else:
-            script = f'''
+            script = f"""
 tell application "Music"
     try
         make new folder with properties {{name:"{folder_name}"}}
@@ -267,18 +267,18 @@ tell application "Music"
         return false
     end try
 end tell
-'''
+"""
         success, output = self._run_applescript(script)
         return success and "true" in output.lower()
 
     def move_playlist_to_folder(self, playlist_name: str, folder_name: str) -> bool:
         """
         Move a playlist to a specific folder.
-        
+
         Returns:
             True if successful, False otherwise
         """
-        script = f'''
+        script = f"""
 tell application "Music"
     try
         set targetPlaylist to playlist "{playlist_name}"
@@ -289,18 +289,18 @@ tell application "Music"
         return false
     end try
 end tell
-'''
+"""
         success, output = self._run_applescript(script)
         return success and "true" in output.lower()
 
     def create_playlist_if_missing(self, playlist_name: str) -> bool:
         """
         Create a new playlist if it doesn't exist.
-        
+
         Returns:
             True if successful or already exists, False otherwise
         """
-        script = f'''
+        script = f"""
 tell application "Music"
     try
         set existing to playlist "{playlist_name}"
@@ -314,34 +314,34 @@ tell application "Music"
         end try
     end try
 end tell
-'''
+"""
         success, output = self._run_applescript(script)
         return success and "true" in output.lower()
 
     def _parse_applescript_dict_list(self, output: str) -> Optional[List[Dict]]:
         """
         Parse AppleScript dictionary list output.
-        
+
         AppleScript returns data in a format like: {key1:value1, key2:value2}, {key1:value1, ...}
-        
+
         This is a simplified parser - production code might need more robust parsing.
         """
         if not output:
             return None
 
         tracks = []
-        
+
         # Pattern to match dict-like structures: {key:value, key:value, ...}
-        dict_pattern = r'\{([^}]+)\}'
+        dict_pattern = r"\{([^}]+)\}"
         matches = re.findall(dict_pattern, output)
 
         for match in matches:
             track_dict = {}
             # Parse key:value pairs
-            pairs = match.split(',')
+            pairs = match.split(",")
             for pair in pairs:
-                if ':' in pair:
-                    key, value = pair.split(':', 1)
+                if ":" in pair:
+                    key, value = pair.split(":", 1)
                     key = key.strip()
                     value = value.strip()
                     # Remove quotes if present
@@ -353,7 +353,7 @@ end tell
                     except ValueError:
                         pass
                     track_dict[key] = value
-            
+
             if track_dict:
                 tracks.append(track_dict)
 
@@ -362,11 +362,11 @@ end tell
     def get_playlist_folder_structure(self) -> Optional[Dict]:
         """
         Get the current folder structure of playlists.
-        
+
         Returns:
             Hierarchical dict or None if failed
         """
-        script = '''
+        script = """
 tell application "Music"
     set folderStructure to {{}}
     repeat with folder in folders
@@ -377,7 +377,7 @@ tell application "Music"
     end repeat
     return folderStructure
 end tell
-'''
+"""
         success, output = self._run_applescript(script)
         if not success:
             return None
@@ -388,42 +388,39 @@ end tell
 
     def get_apple_music_version(self) -> Optional[str]:
         """Get the version of Apple Music/iTunes app."""
-        script = '''
+        script = """
 tell application "Music"
     return version
 end tell
-'''
+"""
         success, output = self._run_applescript(script)
         return output if success else None
 
     def get_playlist_ids(self) -> Dict[str, str]:
         """Get all user playlists with their persistent hex IDs.
-        
+
         Extracts the persistent unique identifiers (16 hex digits) for each playlist,
         which are used by Music.app and persist across sessions. Essential for
         reliable playlist identification.
-        
+
         Returns:
             Dictionary mapping playlist names to their hex IDs
-            
+
         Example:
             {'My Playlist': 'A1B2C3D4E5F6G7H8', 'Favorites': 'F1E2D3C4B5A6G7H8'}
         """
         try:
-            script_path = os.path.join(self.scripts_dir, 'get_ids_playlists.applescript')
+            script_path = os.path.join(self.scripts_dir, "get_ids_playlists.applescript")
             result = subprocess.run(
-                ['osascript', script_path],
-                capture_output=True,
-                text=True,
-                timeout=30
+                ["osascript", script_path], capture_output=True, text=True, timeout=30
             )
-            
+
             if not result.stdout:
                 logger.error("Failed to get playlist IDs from AppleScript")
                 return {}
-            
+
             return self._parse_playlist_ids(result.stdout)
-            
+
         except subprocess.TimeoutExpired:
             logger.error("AppleScript timeout while fetching playlist IDs")
             return {}
@@ -437,49 +434,50 @@ end tell
     @staticmethod
     def _parse_playlist_ids(output: str) -> Dict[str, str]:
         """Parse AppleScript output to extract playlist names and hex IDs.
-        
+
         Args:
             output: Raw AppleScript output containing name:VALUE and id:HEXID patterns
-            
+
         Returns:
             Dictionary mapping playlist names to hex IDs
         """
         playlists = {}
-        
+
         # Find all hex IDs (16 hex digits - Music.app standard)
-        id_pattern = r'([A-F0-9]{16})'
+        id_pattern = r"([A-F0-9]{16})"
         id_matches = list(re.finditer(id_pattern, output, re.IGNORECASE))
-        
+
         if not id_matches:
             logger.warning("No playlist IDs found in AppleScript output")
             return {}
-        
+
         # For each ID found, work backward to find the corresponding name
         for id_match in id_matches:
             hex_id = id_match.group(1)
             pos = id_match.start()
             before_id = output[:pos]
-            
+
             # Find the last "name:" label before this ID
             # Match: name:VALUE where VALUE can have spaces, hyphens, numbers, letters
-            name_pattern = r'name:([^,]*?)(?:,\s*id:|$)'
+            name_pattern = r"name:([^,]*?)(?:,\s*id:|$)"
             name_matches = list(re.finditer(name_pattern, before_id))
-            
+
             if name_matches:
                 # Get the last (most recent) name match
                 last_name_match = name_matches[-1]
                 name = last_name_match.group(1).strip()
-                
+
                 # Remove quotes if present
-                if (name.startswith("'") and name.endswith("'")) or \
-                   (name.startswith('"') and name.endswith('"')):
+                if (name.startswith("'") and name.endswith("'")) or (
+                    name.startswith('"') and name.endswith('"')
+                ):
                     name = name[1:-1]
-                
+
                 if name:  # Only add if we got a valid name
                     playlists[name] = hex_id
                     logger.debug(f"Found playlist: {name} -> {hex_id}")
-        
+
         if not playlists:
             logger.warning("No valid playlist name/ID pairs extracted from output")
-        
+
         return playlists

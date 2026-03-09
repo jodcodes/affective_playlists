@@ -5,13 +5,15 @@ Handles creation of playlist folders and moving playlists between folders.
 Integrates with AppleScript for actual Apple Music operations.
 """
 
+import json
 import os
 import subprocess
+import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Set
-import json
-from logger import setup_logger
-from apple_music import AppleMusicInterface
+from typing import Dict, List, Optional, Set, Tuple
+
+from src.apple_music import AppleMusicInterface
+from src.logger import setup_logger
 
 logger = setup_logger(__name__)
 
@@ -20,11 +22,11 @@ class PlaylistManager:
     """
     Manager for Apple Music playlist operations including folder creation and playlist moving.
     """
-    
+
     def __init__(self, dry_run: bool = False, scripts_dir: str = "scripts"):
         """
         Initialize playlist manager.
-        
+
         Args:
             dry_run: If True, only log operations without executing them
             scripts_dir: Directory containing AppleScript files
@@ -32,45 +34,47 @@ class PlaylistManager:
         self.dry_run = dry_run
         self.scripts_dir = Path(scripts_dir) if isinstance(scripts_dir, str) else scripts_dir
         self.apple_music = AppleMusicInterface(str(self.scripts_dir))
-        
+
         # Cache for folder information
-        self._folder_cache = {}
-        self._playlist_cache = {}
-        
+        self._folder_cache: Dict[str, str] = {}
+        self._playlist_cache: Dict[str, Dict[str, str]] = {}
+
         logger.info(f"Initialized PlaylistManager (dry_run: {dry_run})")
 
-    def _run_applescript_file(self, script_name: str, args: List[str] = None) -> Tuple[bool, str]:
+    def _run_applescript_file(
+        self, script_name: str, args: Optional[List[str]] = None
+    ) -> Tuple[bool, str]:
         """
         Run an AppleScript file with arguments.
-        
+
         Args:
             script_name: Name of the script file (without .applescript extension)
             args: List of arguments to pass to the script
-            
+
         Returns:
             Tuple of (success, output/error_message)
         """
         script_path = self.scripts_dir / f"{script_name}.applescript"
-        
+
         if not script_path.exists():
             return False, f"Script not found: {script_path}"
-        
+
         try:
-            cmd = ['osascript', str(script_path)]
+            cmd = ["osascript", str(script_path)]
             if args:
                 cmd.extend(args)
-                
+
             if self.dry_run:
                 logger.info(f"[DRY-RUN] Would execute: {' '.join(cmd)}")
                 return True, "DRY-RUN: Command not executed"
-                
+
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-            
+
             if result.returncode == 0:
                 return True, result.stdout.strip()
             else:
                 return False, result.stderr.strip()
-                
+
         except subprocess.TimeoutExpired:
             return False, "Script execution timed out"
         except Exception as e:
@@ -79,10 +83,10 @@ class PlaylistManager:
     def _run_applescript_inline(self, script_content: str) -> Tuple[bool, str]:
         """
         Run inline AppleScript content.
-        
+
         Args:
             script_content: AppleScript code to execute
-            
+
         Returns:
             Tuple of (success, output/error_message)
         """
@@ -90,23 +94,26 @@ class PlaylistManager:
             if self.dry_run:
                 logger.info(f"[DRY-RUN] Would execute inline script")
                 return True, "DRY-RUN: Script not executed"
-                
+
             process = subprocess.Popen(
-                ['osascript', '-'],
+                ["osascript", "-"],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                timeout=30
             )
-            
-            stdout, stderr = process.communicate(input=script_content)
-            
+
+            try:
+                stdout, stderr = process.communicate(input=script_content, timeout=30)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                return False, "Script execution timed out"
+
             if process.returncode == 0:
                 return True, stdout.strip()
             else:
                 return False, stderr.strip()
-                
+
         except subprocess.TimeoutExpired:
             return False, "Script execution timed out"
         except Exception as e:
@@ -115,14 +122,14 @@ class PlaylistManager:
     def get_existing_folders(self) -> Dict[str, str]:
         """
         Get existing playlist folders in Apple Music.
-        
+
         Returns:
             Dictionary mapping folder names to persistent IDs
         """
         if self._folder_cache:
             return self._folder_cache
-            
-        script = '''
+
+        script = """
 tell application "Music"
     set folderInfo to {}
     try
@@ -134,27 +141,27 @@ tell application "Music"
     end try
     return folderInfo
 end tell
-'''
-        
+"""
+
         success, output = self._run_applescript_inline(script)
-        
+
         if not success:
             logger.error(f"Failed to get existing folders: {output}")
             return {}
-            
+
         folders = {}
         if output and output != "DRY-RUN: Script not executed":
             try:
                 # Parse the folder information
-                folder_lines = output.split(',') if output else []
+                folder_lines = output.split(",") if output else []
                 for line in folder_lines:
                     line = line.strip()
-                    if '|||' in line:
-                        name, folder_id = line.split('|||', 1)
+                    if "|||" in line:
+                        name, folder_id = line.split("|||", 1)
                         folders[name.strip()] = folder_id.strip()
             except Exception as e:
                 logger.error(f"Failed to parse folder information: {e}")
-                
+
         self._folder_cache = folders
         logger.info(f"Found {len(folders)} existing playlist folders")
         return folders
@@ -162,22 +169,22 @@ end tell
     def create_folder(self, folder_name: str) -> Tuple[bool, Optional[str]]:
         """
         Create a new playlist folder in Apple Music.
-        
+
         Args:
             folder_name: Name of the folder to create
-            
+
         Returns:
             Tuple of (success, folder_persistent_id)
         """
         logger.info(f"Creating playlist folder: {folder_name}")
-        
+
         # Check if folder already exists
         existing_folders = self.get_existing_folders()
         if folder_name in existing_folders:
             logger.info(f"Folder '{folder_name}' already exists")
             return True, existing_folders[folder_name]
-        
-        script = f'''
+
+        script = f"""
 tell application "Music"
     try
         set newFolder to make new playlist with properties {{name:"{folder_name}"}}
@@ -187,10 +194,10 @@ tell application "Music"
         return "ERROR: " & errMsg
     end try
 end tell
-'''
-        
+"""
+
         success, output = self._run_applescript_inline(script)
-        
+
         if success and not output.startswith("ERROR:") and output != "DRY-RUN: Script not executed":
             folder_id = output.strip()
             # Update cache
@@ -198,24 +205,26 @@ end tell
             logger.info(f"Successfully created folder '{folder_name}' with ID: {folder_id}")
             return True, folder_id
         else:
-            error_msg = output if output.startswith("ERROR:") else f"Failed to create folder: {output}"
+            error_msg = (
+                output if output.startswith("ERROR:") else f"Failed to create folder: {output}"
+            )
             logger.error(error_msg)
             return False, None
 
     def get_playlist_info(self, playlist_name: str) -> Optional[Dict[str, str]]:
         """
         Get information about a specific playlist.
-        
+
         Args:
             playlist_name: Name of the playlist
-            
+
         Returns:
             Dictionary with playlist info (name, persistent_id) or None
         """
         if playlist_name in self._playlist_cache:
             return self._playlist_cache[playlist_name]
-        
-        script = f'''
+
+        script = f"""
 tell application "Music"
     try
         set pl to first playlist whose name is "{playlist_name}"
@@ -226,16 +235,13 @@ tell application "Music"
         return "ERROR: " & errMsg
     end try
 end tell
-'''
-        
+"""
+
         success, output = self._run_applescript_inline(script)
-        
+
         if success and not output.startswith("ERROR:") and "|||" in output:
             name, playlist_id = output.split("|||", 1)
-            playlist_info = {
-                "name": name.strip(),
-                "persistent_id": playlist_id.strip()
-            }
+            playlist_info = {"name": name.strip(), "persistent_id": playlist_id.strip()}
             self._playlist_cache[playlist_name] = playlist_info
             return playlist_info
         else:
@@ -245,44 +251,48 @@ end tell
     def move_playlist_to_folder(self, playlist_name: str, folder_name: str) -> bool:
         """
         Move a playlist to a specific folder.
-        
+
         Args:
             playlist_name: Name of the playlist to move
             folder_name: Name of the target folder
-            
+
         Returns:
             True if successful, False otherwise
         """
         logger.info(f"Moving playlist '{playlist_name}' to folder '{folder_name}'")
-        
+
         # Get playlist information
         playlist_info = self.get_playlist_info(playlist_name)
         if not playlist_info:
             logger.error(f"Playlist not found: {playlist_name}")
             return False
-            
+
         # Get or create target folder
         existing_folders = self.get_existing_folders()
-        
+
         if folder_name not in existing_folders:
             logger.info(f"Folder '{folder_name}' doesn't exist, creating it...")
             success, folder_id = self.create_folder(folder_name)
-            if not success:
+            if not success or folder_id is None:
                 logger.error(f"Failed to create folder: {folder_name}")
                 return False
         else:
             folder_id = existing_folders[folder_name]
-            
+
         # Move playlist using the move script
         playlist_id = playlist_info["persistent_id"]
-        
+
         if self.dry_run:
-            logger.info(f"[DRY-RUN] Would move playlist '{playlist_name}' (ID: {playlist_id}) "
-                       f"to folder '{folder_name}' (ID: {folder_id})")
+            logger.info(
+                f"[DRY-RUN] Would move playlist '{playlist_name}' (ID: {playlist_id}) "
+                f"to folder '{folder_name}' (ID: {folder_id})"
+            )
             return True
-            
-        success, output = self._run_applescript_file("move_playlist_to_folder", [playlist_id, folder_id])
-        
+
+        success, output = self._run_applescript_file(
+            "move_playlist_to_folder", [playlist_id, folder_id]
+        )
+
         if success and "SUCCESS" in output:
             logger.info(f"Successfully moved playlist '{playlist_name}' to folder '{folder_name}'")
             return True
@@ -293,18 +303,18 @@ end tell
     def ensure_genre_folders_exist(self, target_genres: List[str]) -> Dict[str, bool]:
         """
         Ensure all target genre folders exist in Apple Music.
-        
+
         Args:
             target_genres: List of genre folder names to create
-            
+
         Returns:
             Dictionary mapping genre names to creation success status
         """
         logger.info(f"Ensuring {len(target_genres)} genre folders exist")
-        
+
         results = {}
         existing_folders = self.get_existing_folders()
-        
+
         for genre in target_genres:
             if genre in existing_folders:
                 logger.info(f"Genre folder '{genre}' already exists")
@@ -313,43 +323,47 @@ end tell
                 logger.info(f"Creating genre folder: {genre}")
                 success, _ = self.create_folder(genre)
                 results[genre] = success
-                
+
         return results
 
     def organize_playlists(self, playlist_assignments: Dict[str, str]) -> Dict[str, bool]:
         """
         Organize multiple playlists into their assigned folders.
-        
+
         Args:
             playlist_assignments: Dictionary mapping playlist names to target folder names
-            
+
         Returns:
             Dictionary mapping playlist names to move success status
         """
         logger.info(f"Organizing {len(playlist_assignments)} playlists")
-        
+
         results = {}
-        
+
         # Get all target folders
         target_folders = set(playlist_assignments.values())
-        
+
         # Ensure all target folders exist
         folder_results = self.ensure_genre_folders_exist(list(target_folders))
-        
+
         # Move playlists
         for playlist_name, folder_name in playlist_assignments.items():
             if not folder_results.get(folder_name, False):
-                logger.error(f"Cannot move playlist '{playlist_name}' - target folder '{folder_name}' unavailable")
+                logger.error(
+                    f"Cannot move playlist '{playlist_name}' - target folder '{folder_name}' unavailable"
+                )
                 results[playlist_name] = False
                 continue
-                
+
             success = self.move_playlist_to_folder(playlist_name, folder_name)
             results[playlist_name] = success
-            
+
         # Summary
         successful_moves = sum(1 for success in results.values() if success)
-        logger.info(f"Playlist organization complete: {successful_moves}/{len(playlist_assignments)} successful")
-        
+        logger.info(
+            f"Playlist organization complete: {successful_moves}/{len(playlist_assignments)} successful"
+        )
+
         return results
 
     def clear_cache(self):

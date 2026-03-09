@@ -10,22 +10,21 @@ Test coverage:
 - Rate limiting behavior
 """
 
-import unittest
-import sys
 import os
+import sys
+import unittest
 from datetime import datetime
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
-# Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-
-from metadata_enrichment import (
-    MetadataField, DatabaseSource, TrackIdentifier,
-    MetadataEntry, EnrichedMetadata, MetadataEnricher
+from src.metadata_enrichment import (
+    DatabaseSource,
+    EnrichedMetadata,
+    MetadataEnricher,
+    MetadataEntry,
+    MetadataField,
+    TrackIdentifier,
 )
-from metadata_queries import (
-    MusicBrainzQuery, MetadataQueryOrchestrator
-)
+from src.metadata_queries import MetadataQueryOrchestrator, MusicBrainzQuery
 
 
 class TestTrackIdentifier(unittest.TestCase):
@@ -40,12 +39,7 @@ class TestTrackIdentifier(unittest.TestCase):
 
     def test_track_identifier_with_duration(self):
         """Test track identifier with duration."""
-        track = TrackIdentifier(
-            artist="Adele",
-            title="Hello",
-            duration_seconds=295,
-            album="25"
-        )
+        track = TrackIdentifier(artist="Adele", title="Hello", duration_seconds=295, album="25")
         self.assertEqual(track.duration_seconds, 295)
         self.assertEqual(track.album, "25")
 
@@ -56,14 +50,10 @@ class TestTrackIdentifier(unittest.TestCase):
 
     def test_track_identifier_to_dict(self):
         """Test converting track identifier to dictionary."""
-        track = TrackIdentifier(
-            artist="Pink Floyd",
-            title="Comfortably Numb",
-            duration_seconds=400
-        )
+        track = TrackIdentifier(artist="Pink Floyd", title="Comfortably Numb", duration_seconds=400)
         track_dict = track.to_dict()
-        self.assertEqual(track_dict['artist'], "Pink Floyd")
-        self.assertEqual(track_dict['duration_seconds'], 400)
+        self.assertEqual(track_dict["artist"], "Pink Floyd")
+        self.assertEqual(track_dict["duration_seconds"], 400)
 
 
 class TestMetadataEntry(unittest.TestCase):
@@ -75,7 +65,7 @@ class TestMetadataEntry(unittest.TestCase):
             field=MetadataField.GENRE,
             value="Rock",
             source=DatabaseSource.MUSICBRAINZ,
-            confidence=0.95
+            confidence=0.95,
         )
         self.assertEqual(entry.field, MetadataField.GENRE)
         self.assertEqual(entry.value, "Rock")
@@ -84,9 +74,7 @@ class TestMetadataEntry(unittest.TestCase):
     def test_metadata_entry_timestamp(self):
         """Test that timestamp is set automatically."""
         entry = MetadataEntry(
-            field=MetadataField.YEAR,
-            value="1973",
-            source=DatabaseSource.MUSICBRAINZ
+            field=MetadataField.YEAR, value="1973", source=DatabaseSource.MUSICBRAINZ
         )
         self.assertIsNotNone(entry.timestamp)
         # Check timestamp is ISO format
@@ -98,12 +86,12 @@ class TestMetadataEntry(unittest.TestCase):
             field=MetadataField.BPM,
             value="120",
             source=DatabaseSource.ACOUSTICBRAINZ,
-            confidence=0.9
+            confidence=0.9,
         )
         entry_dict = entry.to_dict()
-        self.assertEqual(entry_dict['field'], 'bpm')
-        self.assertEqual(entry_dict['value'], '120')
-        self.assertEqual(entry_dict['source'], 'ACOUSTICBRAINZ')
+        self.assertEqual(entry_dict["field"], "bpm")
+        self.assertEqual(entry_dict["value"], "120")
+        self.assertEqual(entry_dict["source"], "ACOUSTICBRAINZ")
 
 
 class TestEnrichedMetadata(unittest.TestCase):
@@ -112,21 +100,14 @@ class TestEnrichedMetadata(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         self.track = TrackIdentifier(
-            artist="Queen",
-            title="Bohemian Rhapsody",
-            duration_seconds=355
+            artist="Queen", title="Bohemian Rhapsody", duration_seconds=355
         )
-        self.enriched = EnrichedMetadata(
-            track_id=self.track,
-            filepath="/path/to/song.mp3"
-        )
+        self.enriched = EnrichedMetadata(track_id=self.track, filepath="/path/to/song.mp3")
 
     def test_add_single_entry(self):
         """Test adding single metadata entry."""
         entry = MetadataEntry(
-            field=MetadataField.GENRE,
-            value="Rock",
-            source=DatabaseSource.MUSICBRAINZ
+            field=MetadataField.GENRE, value="Rock", source=DatabaseSource.MUSICBRAINZ
         )
         self.enriched.add_entry(entry)
         self.assertEqual(len(self.enriched.entries), 1)
@@ -138,18 +119,15 @@ class TestEnrichedMetadata(unittest.TestCase):
             field=MetadataField.YEAR,
             value="1975",
             source=DatabaseSource.MUSICBRAINZ,
-            confidence=0.7
+            confidence=0.7,
         )
         entry2 = MetadataEntry(
-            field=MetadataField.YEAR,
-            value="1975",
-            source=DatabaseSource.LASTFM,
-            confidence=0.95
+            field=MetadataField.YEAR, value="1975", source=DatabaseSource.LASTFM, confidence=0.95
         )
-        
+
         self.enriched.add_entry(entry1)
         self.enriched.add_entry(entry2)
-        
+
         # Higher confidence (0.95) should be kept
         self.assertEqual(self.enriched.entries[MetadataField.YEAR].confidence, 0.95)
         self.assertEqual(self.enriched.entries[MetadataField.YEAR].source, DatabaseSource.LASTFM)
@@ -161,10 +139,10 @@ class TestEnrichedMetadata(unittest.TestCase):
             MetadataEntry(MetadataField.YEAR, "1975", DatabaseSource.MUSICBRAINZ),
             MetadataEntry(MetadataField.BPM, "95", DatabaseSource.ACOUSTICBRAINZ),
         ]
-        
+
         for entry in entries:
             self.enriched.add_entry(entry)
-        
+
         self.assertEqual(len(self.enriched.entries), 3)
         self.assertIn(MetadataField.GENRE, self.enriched.entries)
         self.assertIn(MetadataField.YEAR, self.enriched.entries)
@@ -174,10 +152,7 @@ class TestEnrichedMetadata(unittest.TestCase):
         """Test marking field as skipped."""
         self.enriched.mark_skipped(MetadataField.BPM, "No BPM data available")
         self.assertIn(MetadataField.BPM, self.enriched.skipped_fields)
-        self.assertEqual(
-            self.enriched.skipped_fields[MetadataField.BPM],
-            "No BPM data available"
-        )
+        self.assertEqual(self.enriched.skipped_fields[MetadataField.BPM], "No BPM data available")
 
 
 class TestDataValidation(unittest.TestCase):
@@ -255,11 +230,7 @@ class TestConflictResolutionAlgorithm(unittest.TestCase):
 
     def test_genre_weighted_vote(self):
         """Test genre conflict: use weighted vote by confidence."""
-        votes = {
-            "Rock": 0.95,
-            "Rock": 0.90,
-            "Pop": 0.7
-        }
+        votes = {"Rock": 0.95, "Rock": 0.90, "Pop": 0.7}
         # Simplified: highest confidence wins
         winner = max(votes.items(), key=lambda x: x[1])
         self.assertEqual(winner[0], "Rock")
@@ -274,7 +245,7 @@ class TestConflictResolutionAlgorithm(unittest.TestCase):
         """Test minimum confidence threshold of 0.6 to apply."""
         low_confidence = 0.5
         high_confidence = 0.65
-        
+
         self.assertFalse(low_confidence >= 0.6)
         self.assertTrue(high_confidence >= 0.6)
 
@@ -328,30 +299,27 @@ class TestMockMetadataEnrichment(unittest.TestCase):
     def test_mock_enrichment_single_field(self):
         """Test mock enrichment returns expected structure."""
         # This would test the full enrichment flow with mock data
-        mock_result = {
-            'genre': ('Rock', 0.95),
-            'year': ('1975', 0.90)
-        }
-        
+        mock_result = {"genre": ("Rock", 0.95), "year": ("1975", 0.90)}
+
         self.assertEqual(len(mock_result), 2)
-        self.assertEqual(mock_result['genre'][0], 'Rock')
-        self.assertEqual(mock_result['genre'][1], 0.95)
+        self.assertEqual(mock_result["genre"][0], "Rock")
+        self.assertEqual(mock_result["genre"][1], 0.95)
 
     def test_enrichment_graceful_missing_source(self):
         """Test enrichment continues if one source fails."""
         results = []
-        sources = ['musicbrainz', 'spotify', 'lastfm']
-        
+        sources = ["musicbrainz", "spotify", "lastfm"]
+
         # Simulate spotify failure
         for source in sources:
-            if source == 'spotify':
+            if source == "spotify":
                 continue  # Skip failed source
             results.append(source)
-        
+
         # Should have results from other sources
         self.assertEqual(len(results), 2)
-        self.assertIn('musicbrainz', results)
-        self.assertIn('lastfm', results)
+        self.assertIn("musicbrainz", results)
+        self.assertIn("lastfm", results)
 
 
 class TestStateManagement(unittest.TestCase):
@@ -365,25 +333,25 @@ class TestStateManagement(unittest.TestCase):
             "old": "Unknown",
             "new": "Rock",
             "timestamp": datetime.now().isoformat(),
-            "source": "MUSICBRAINZ"
+            "source": "MUSICBRAINZ",
         }
-        
-        self.assertIn('track_id', history_entry)
-        self.assertIn('field', history_entry)
-        self.assertIn('old', history_entry)
-        self.assertIn('new', history_entry)
-        self.assertIn('timestamp', history_entry)
+
+        self.assertIn("track_id", history_entry)
+        self.assertIn("field", history_entry)
+        self.assertIn("old", history_entry)
+        self.assertIn("new", history_entry)
+        self.assertIn("timestamp", history_entry)
 
     def test_recovery_from_interrupted_batch(self):
         """Test ability to resume from interrupted batch."""
         processed_tracks = ["track1", "track2", "track3"]
         remaining_tracks = ["track4", "track5"]
-        
+
         # Simulate resuming from checkpoint
         last_processed = processed_tracks[-1]
         all_tracks = processed_tracks + remaining_tracks
-        to_process = all_tracks[len(processed_tracks):]
-        
+        to_process = all_tracks[len(processed_tracks) :]
+
         # Clean test - just verify logic works
         self.assertEqual(last_processed, "track3")
         self.assertEqual(to_process, ["track4", "track5"])
@@ -396,12 +364,13 @@ class TestPerformanceRequirements(unittest.TestCase):
         """Test that individual track processing is fast."""
         # < 5 seconds per track per spec
         import time
+
         start = time.time()
-        
+
         # Simulate quick operation
         track = TrackIdentifier("Test", "Track")
         enriched = EnrichedMetadata(track, "/test/path")
-        
+
         elapsed = time.time() - start
         self.assertLess(elapsed, 5.0)
 
@@ -418,5 +387,5 @@ class TestPerformanceRequirements(unittest.TestCase):
         self.assertEqual(max_tracks, 500)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main(verbosity=2)

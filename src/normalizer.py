@@ -6,17 +6,22 @@ Used by: plsort, 4tempers, metad_enr
 """
 
 import re
-from typing import List, Set, Dict
+from typing import Dict, List, Optional, Set
 
 
 class TextNormalizer:
     """Normalize text fields for consistent comparison."""
 
-    def __init__(self, lowercase: bool = True, trim: bool = True, 
-                 dedupe: bool = True, normalize_chars: bool = True):
+    def __init__(
+        self,
+        lowercase: bool = True,
+        trim: bool = True,
+        dedupe: bool = True,
+        normalize_chars: bool = True,
+    ):
         """
         Initialize text normalizer.
-        
+
         Args:
             lowercase: Convert text to lowercase
             trim: Remove leading/trailing whitespace
@@ -38,20 +43,20 @@ class TextNormalizer:
 
         if self.normalize_chars:
             # Normalize special characters
-            text = re.sub(r'[&]', 'and', text)
-            text = re.sub(r'[^\w\s-]', '', text)
-            text = re.sub(r'[-]+', '-', text)
+            text = re.sub(r"[&]", "and", text)
+            text = re.sub(r"[^\w\s-]", "", text)
+            text = re.sub(r"[-]+", "-", text)
 
         if self.trim:
             text = text.strip()
-            text = re.sub(r'\s+', ' ', text)
+            text = re.sub(r"\s+", " ", text)
 
         return text
 
     def normalize_list(self, items: List[str]) -> List[str]:
         """Normalize a list of strings and optionally deduplicate."""
         normalized = [self.normalize(item) for item in items if item]
-        
+
         if self.dedupe:
             seen: Set[str] = set()
             unique = []
@@ -60,16 +65,16 @@ class TextNormalizer:
                     seen.add(item)
                     unique.append(item)
             return unique
-        
+
         return normalized
 
-    def normalize_dict_values(self, d: dict, keys: List[str] = None) -> dict:
+    def normalize_dict_values(self, d: dict, keys: Optional[List[str]] = None) -> dict:
         """Normalize specific dictionary values."""
         result = d.copy()
         keys_to_normalize = keys if keys else [k for k, v in d.items() if isinstance(v, str)]
-        
+
         for key in keys_to_normalize:
             if key in result and isinstance(result[key], str):
                 result[key] = self.normalize(result[key])
-        
+
         return result
