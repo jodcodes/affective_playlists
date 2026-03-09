@@ -25,6 +25,7 @@ from flask import Flask, jsonify, render_template_string, request
 from src.db import setup_database
 from src.job_store import get_job_store
 from src.rate_limiter import rate_limit, check_job_quota
+from src.realtime import get_realtime_manager, simulate_sse_stream
 from src.logger import setup_logger
 
 # Try to import Celery tasks
