@@ -8,10 +8,11 @@ References: openspec/specs/realtime/spec.md
 
 import json
 import time
-from typing import Dict, Optional, Set
 from datetime import datetime
+from typing import Dict, Optional, Set
 
 from flask import request
+
 from src.logger import setup_logger
 
 logger = setup_logger(__name__)

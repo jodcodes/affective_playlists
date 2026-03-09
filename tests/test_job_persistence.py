@@ -15,9 +15,10 @@ Test coverage:
 """
 
 import json
-import pytest
 from datetime import datetime, timedelta
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 
 class TestDatabaseInitialization:

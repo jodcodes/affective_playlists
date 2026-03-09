@@ -16,21 +16,21 @@ State management:
 import os
 import sys
 import time
+import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-import uuid
 
 from flask import Flask, jsonify, render_template_string, request
 
 from src.db import setup_database
 from src.job_store import get_job_store
-from src.rate_limiter import rate_limit, check_job_quota
-from src.realtime import get_realtime_manager, simulate_sse_stream
 from src.logger import setup_logger
+from src.rate_limiter import check_job_quota, rate_limit
+from src.realtime import get_realtime_manager, simulate_sse_stream
 
 # Try to import Celery tasks
 try:
-    from src.tasks import enrich_metadata, analyze_mood, organize_playlists
+    from src.tasks import analyze_mood, enrich_metadata, organize_playlists
 
     CELERY_AVAILABLE = True
 except ImportError:

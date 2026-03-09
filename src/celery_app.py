@@ -7,7 +7,9 @@ References: openspec/specs/background-jobs/spec.md
 """
 
 import os
+
 from celery import Celery
+
 from src.logger import setup_logger
 
 logger = setup_logger(__name__)

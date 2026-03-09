@@ -43,7 +43,7 @@ def check_redis():
             return True
     except Exception:
         pass
-    
+
     print("⚠ Redis not detected (required for Celery broker)")
     print("  Install: brew install redis (macOS) or apt-get install redis-server (Linux)")
     print("  Or run: docker run -d -p 6379:6379 redis:7")
@@ -58,7 +58,7 @@ def check_dependencies():
         "celery": "Celery",
         "redis": "Redis Python client",
     }
-    
+
     missing = []
     for module, name in required.items():
         try:
@@ -67,27 +67,27 @@ def check_dependencies():
         except ImportError:
             print(f"❌ {name} missing")
             missing.append(module)
-    
+
     if missing:
         print(f"\n⚠ Install missing packages:")
         print(f"  pip install {' '.join(missing)}")
         return False
-    
+
     return True
 
 
 def show_menu():
     """Show deployment options."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("AFFECTIVE_PLAYLISTS - LOCAL DEPLOYMENT")
-    print("="*70)
+    print("=" * 70)
     print("\nSelect how to run:")
     print("  1) Flask web server ONLY (no background jobs)")
     print("  2) Flask + Celery worker (full stack)")
     print("  3) Database initialization ONLY")
     print("  4) Run tests")
     print("  5) Exit")
-    
+
     choice = input("\nChoice [1-5]: ").strip()
     return choice
 
@@ -97,10 +97,10 @@ def start_flask():
     print("\n🚀 Starting Flask web server...")
     print("   URL: http://localhost:5000")
     print("   Press Ctrl+C to stop\n")
-    
+
     os.environ["FLASK_APP"] = "src.web_server"
     os.environ["FLASK_ENV"] = "development"
-    
+
     subprocess.run(
         [sys.executable, "-m", "src.web_server"],
         cwd=Path(__file__).parent,
@@ -113,7 +113,7 @@ def start_celery():
     print("   Broker: redis://localhost:6379/0")
     print("   Queues: enrichment, temperament, organization, background")
     print("   Press Ctrl+C to stop\n")
-    
+
     subprocess.run(
         [
             sys.executable,
@@ -133,9 +133,9 @@ def start_celery():
 
 def start_full_stack():
     """Start Flask + Celery (requires 2 terminals)."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("FULL STACK DEPLOYMENT")
-    print("="*70)
+    print("=" * 70)
     print("\nThis requires TWO terminal windows:")
     print("\n  Terminal 1 - Flask Web Server:")
     print("    $ python run_local.py")
@@ -156,9 +156,9 @@ def start_full_stack():
 def init_database():
     """Initialize database."""
     print("\n📊 Initializing database...")
-    
+
     from src.db import init_db
-    
+
     try:
         db_url = os.getenv("DATABASE_URL", "sqlite:///jobs.db")
         engine, SessionLocal = init_db(db_url)
@@ -174,7 +174,7 @@ def run_tests():
     """Run test suite."""
     print("\n🧪 Running test suite...")
     print("   (excluding Celery import tests which require Redis)\n")
-    
+
     subprocess.run(
         [
             sys.executable,
@@ -193,7 +193,7 @@ def run_tests():
 def show_environment():
     """Show deployment environment info."""
     print("\n📋 DEPLOYMENT ENVIRONMENT")
-    print("="*70)
+    print("=" * 70)
     print(f"  Database:   {os.getenv('DATABASE_URL', 'sqlite:///jobs.db')}")
     print(f"  Celery Broker: {os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')}")
     print(f"  Worker Concurrency: {os.getenv('CELERY_WORKER_CONCURRENCY', '2')}")
@@ -202,36 +202,36 @@ def show_environment():
     print("\n  Environment variables can be set in .env file or shell:")
     print("    export DATABASE_URL=postgresql://user:pass@localhost/db")
     print("    export CELERY_BROKER_URL=redis://localhost:6379/0")
-    print("="*70 + "\n")
+    print("=" * 70 + "\n")
 
 
 def main():
     """Main deployment menu."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("AFFECTIVE PLAYLISTS - PRODUCTION-READY FEATURES")
-    print("="*70)
-    
+    print("=" * 70)
+
     # Check environment
     print("\n📦 Environment Check:")
     check_python()
     redis_ok = check_redis()
     deps_ok = check_dependencies()
-    
+
     if not deps_ok:
         print("\n💡 Install dependencies: pip install -r requirements.txt")
         return
-    
+
     show_environment()
-    
+
     # Initialize database
     db_init = input("Initialize database? [y/n] (default: y): ").strip().lower()
     if db_init != "n":
         init_database()
-    
+
     # Menu loop
     while True:
         choice = show_menu()
-        
+
         if choice == "1":
             start_flask()
         elif choice == "2":

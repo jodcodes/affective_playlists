@@ -22,7 +22,9 @@ Test coverage:
 """
 
 import json
+
 import pytest
+
 from src.web_server import app
 
 

@@ -8,10 +8,11 @@ References: openspec/specs/api-resilience/spec.md
 
 import time
 from datetime import datetime, timedelta
-from typing import Dict, Optional, Tuple
 from functools import wraps
+from typing import Dict, Optional, Tuple
 
-from flask import request, jsonify
+from flask import jsonify, request
+
 from src.logger import setup_logger
 
 logger = setup_logger(__name__)

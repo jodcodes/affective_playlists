@@ -3,7 +3,7 @@ affective_playlists Package
 
 Unified package for three music analysis and organization subprojects:
 - 4tempers: AI-based playlist temperament analysis
-- metad_enr: Metadata filling and enrichment  
+- metad_enr: Metadata filling and enrichment
 - plsort: Playlist organization and classification
 
 All shared utilities are available from the 'shared' module.

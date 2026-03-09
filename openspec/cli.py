@@ -24,7 +24,7 @@ class OpenSpecCLI:
 
     def __init__(self, root_dir: str = "."):
         """Initialize OpenSpec CLI.
-        
+
         Args:
             root_dir: Root directory of openspec folder
         """
@@ -76,9 +76,7 @@ class OpenSpecCLI:
                 print(f"    ├─ spec.md ({lines} lines, {size} bytes)")
                 print(f"    └─ modified: {mtime.strftime('%Y-%m-%d %H:%M')}")
             else:
-                print(
-                    f"  ⚠ {change_dir.name}/ (missing spec.md - empty change)"
-                )
+                print(f"  ⚠ {change_dir.name}/ (missing spec.md - empty change)")
 
         return 0
 
@@ -91,10 +89,10 @@ class OpenSpecCLI:
 
     def propose_change(self, change_name: str) -> int:
         """Create a new change package.
-        
+
         Args:
             change_name: Name of the change
-            
+
         Returns:
             Exit code
         """
@@ -145,7 +143,7 @@ Add GIVEN/WHEN/THEN scenarios here.
 
     def verify_specs(self) -> int:
         """Verify all specs exist and are valid.
-        
+
         Returns:
             Exit code (0 = all valid, 1 = errors found)
         """
@@ -198,10 +196,10 @@ Add GIVEN/WHEN/THEN scenarios here.
 
     def archive_change(self, change_name: str) -> int:
         """Archive a change package to base specs.
-        
+
         Args:
             change_name: Name of the change to archive
-            
+
         Returns:
             Exit code
         """
@@ -251,7 +249,7 @@ Add GIVEN/WHEN/THEN scenarios here.
 
     def status(self) -> int:
         """Show spec/change status summary.
-        
+
         Returns:
             Exit code
         """
