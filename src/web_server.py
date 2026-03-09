@@ -10,7 +10,7 @@ Implementation note: This follows the browser-frontend specification:
 State management:
 - Enrichment and temperament operations use task queue (Celery)
 - Job state persisted to database via SQLAlchemy ORM
-- In-memory state for fallback when Celery unavailable
+- Real-time updates via WebSocket (fallback: HTTP polling)
 """
 
 import os
@@ -25,6 +25,13 @@ from flask import Flask, jsonify, render_template_string, request
 from src.db import setup_database
 from src.job_store import get_job_store
 from src.logger import setup_logger
+
+# Try to import Celery tasks
+try:
+    from src.tasks import enrich_metadata, analyze_mood, organize_playlists
+    CELERY_AVAILABLE = True
+except ImportError:
+    CELERY_AVAILABLE = False
 
 # Setup logger
 logger = setup_logger(__name__)
@@ -538,6 +545,7 @@ def start_enrichment():
     try:
         data = request.get_json() or {}
         playlist_ids = data.get("playlist_ids", [])
+        sources = data.get("sources", ["spotify"])
         
         # Create unique job ID
         job_id = f"enrichment-{int(time.time())}-{uuid.uuid4().hex[:8]}"
@@ -552,8 +560,18 @@ def start_enrichment():
             client_ip=request.remote_addr,
         )
         
-        # In real implementation, would submit to Celery queue here
-        # For now, just create the job record
+        # Submit to Celery queue if available
+        if CELERY_AVAILABLE:
+            try:
+                enrich_metadata.apply_async(
+                    args=[job_id, playlist_ids, sources],
+                    task_id=job_id,
+                )
+                logger.info(f"Submitted enrichment task to Celery: {job_id}")
+            except Exception as e:
+                logger.warning(f"Celery unavailable, job persisted to database: {e}")
+        else:
+            logger.info(f"Celery unavailable, job persisted to database: {job_id}")
         
         total_tracks = len(playlist_ids) * 10  # Mock estimation
         
