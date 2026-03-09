@@ -32,7 +32,7 @@ jobs:
         run: mypy src
 
       - name: Lint
-        run: pylint src
+        run: pylint src --fail-under=8.0
 
       - name: Test
         run: pytest tests -v --tb=short
