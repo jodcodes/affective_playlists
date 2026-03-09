@@ -1,33 +1,29 @@
 # Summary Documentation
 
-This folder contains all reports, summaries, and quick reference guides for the affective_playlists project.
+This folder contains quick reference guides and project resources.
 
-## Implementation Reports
+## Quick Reference Guides
 
-Detailed reports on feature implementation and testing:
+Lookup guides for common tasks and troubleshooting:
 
-- **[METADATA_ENRICHMENT_REPORT.md](IMPLEMENTATION_REPORTS/METADATA_ENRICHMENT_REPORT.md)** - Complete metadata enrichment analysis
-  - Test results (31/31 passing)
-  - Live demo on 34-track playlist
-  - Performance analysis (140% better than spec)
-  - Specification compliance matrix
-  - Recommendations for production
+- **SRC_ARCHITECTURE_GUIDE.md** - Source code organization and layer breakdown
+- **PROJECT_SUMMARIES/** - Status information and planning resources
+- **QUICK_REFERENCE/** - Task-specific quick-lookup guides
+  - CLI_UI_QUICK_REFERENCE.md
+  - TESTING_QUICK_REFERENCE.md
+  - DATABASE_SOURCES_GUIDE.md
+  - And others...
 
-See [IMPLEMENTATION_REPORTS/README.md](IMPLEMENTATION_REPORTS/README.md) for complete index.
+## Related Sections
 
-## Project Summaries
+- **Implementation Reports** → See [docs/reference-reports/IMPLEMENTATION_REPORTS/](../reference-reports/IMPLEMENTATION_REPORTS/)
+  - Detailed feature analysis with metrics and compliance validation
 
-High-level summaries of project phases and status:
+- **Project Status & Planning** → See [docs/project-management/](../project-management/)
+  - fix_plan.md, spec_debt.md, NEXT_STEPS.md
 
-- **[SETUP_STATUS_SUMMARY.md](PROJECT_SUMMARIES/SETUP_STATUS_SUMMARY.md)** - Current setup and configuration status
-  - Features implemented and activated
-  - Setup requirements
-  - Quick start procedures
-  - Troubleshooting guide
-
-- **[UPDATE_SUMMARY.md](PROJECT_SUMMARIES/UPDATE_SUMMARY.md)** - Documentation update summary
-  - What was added to specifications
-  - Missing sections that were filled
+- **Archived Reports** → See [docs/archived-reports/](../archived-reports/)
+  - Historical project snapshots from January 2026 brownfield phase
   - Professional engineering standards applied
 
 - **[ROADMAP_SUMMARY.md](PROJECT_SUMMARIES/ROADMAP_SUMMARY.md)** (planned) - Development roadmap
@@ -101,7 +97,7 @@ Include: Common commands, examples, FAQ
 ### For Project Managers
 - Start with current STATUS_SUMMARY.md
 - Review UPDATE_SUMMARY.md for recent changes
-- Check NEXT_STEPS.md for roadmap
+- Check `../../NEXT_STEPS.md` for roadmap
 
 ### For Developers
 - Use TESTING_QUICK_REFERENCE.md for test commands

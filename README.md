@@ -17,7 +17,7 @@ A powerful, single-command music tool that combines three complementary features
 Clone and install in one command:
 
 ```bash
-git clone https://github.com/sokkohai/affective_playlists.git
+git clone https://github.com/jodcodes/affective_playlists.git
 cd affective_playlists
 bash install.sh
 ```
@@ -218,6 +218,23 @@ pytest tests/ -v --cov=src
 
 # Run specific test
 pytest tests/test_metadata_fill.py::TestMetadataFiller -v
+```
+
+### Spec-Driven Workflow (Brownfield)
+The repository now includes a brownfield spec-driven scaffold:
+
+- `AGENTS.md` - agent workflow and quality gates
+- `openspec/config.yaml` - OpenSpec project configuration
+- `openspec/specs/` - seeded domain specifications
+- `fix_plan.md` - prioritized execution plan
+- `spec_debt.md` - behavior not yet fully specified
+
+Recommended OpenSpec cycle for changes:
+
+```bash
+openspec propose <change-name>
+openspec verify
+openspec archive <change-name>
 ```
 
 ## 🐛 Troubleshooting

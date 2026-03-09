@@ -34,6 +34,7 @@ from cli_ui import (
 )
 
 logger = setup_logger("affective_playlists")
+IS_MACOS = sys.platform == "darwin"
 
 # Import main modules
 temperament_analyzer = None
@@ -44,28 +45,62 @@ try:
     from temperament_analyzer import TemperamentAnalyzer, MusicAppClient, OpenAILLMClient
     temperament_analyzer = sys.modules.get('temperament_analyzer')
 except ImportError as e:
-    print(f"Warning: Could not import temperament_analyzer: {e}")
+    logger.warning(f"Could not import temperament_analyzer: {e}")
 
 try:
     from metadata_fill import MetadataFillCLI
     metadata_fill = sys.modules.get('metadata_fill')
 except ImportError as e:
-    print(f"Warning: Could not import metadata_fill: {e}")
+    logger.warning(f"Could not import metadata_fill: {e}")
 except Exception as e:
-    print(f"Error importing metadata_fill: {e}")
+    logger.error(f"Error importing metadata_fill: {e}")
 
 try:
     import plsort as plsort_module
 except ImportError as e:
-    print(f"Warning: Could not import plsort: {e}")
+    logger.warning(f"Could not import plsort: {e}")
+
+
+def validate_openai_api_key() -> bool:
+    """Validate that OPENAI_API_KEY is configured.
+    
+    Returns:
+        True if valid, False otherwise (and prints user-facing error).
+    """
+    api_key = os.getenv('OPENAI_API_KEY')
+    if not api_key:
+        print(error("OPENAI_API_KEY is not configured."))
+        print(info("Setup: Add to your .env file or set environment variable:"))
+        print(info("  OPENAI_API_KEY=sk-your-actual-key"))
+        print(info("Get a key from: https://platform.openai.com/api-keys"))
+        logger.error("OPENAI_API_KEY missing at temperament analysis startup")
+        return False
+    return True
+
+
+def require_macos(feature_name: str) -> bool:
+    """Return False and print a user-facing error if the feature needs macOS."""
+    if IS_MACOS:
+        return True
+
+    print(error(f"{feature_name} requires macOS and Music.app (AppleScript integration)."))
+    print(info("Tip: On non-macOS, use metadata enrichment in Folder mode."))
+    return False
 
 
 def run_temperament_analysis(args=None):
     """Run 4tempers - AI temperament analysis."""
     print_header("🎭 Temperament Analysis", "AI-based Playlist Emotion Classification")
+
+    if not require_macos("Temperament analysis"):
+        return 1
+    
+    if not validate_openai_api_key():
+        return 1
     
     try:
         print(info("Initializing clients..."))
+        logger.debug("Initializing temperament analysis clients")
         
         # Initialize clients
         music_client = MusicAppClient()
@@ -74,10 +109,12 @@ def run_temperament_analysis(args=None):
         # Authenticate
         print(info("Connecting to Music.app..."))
         if not music_client.authenticate():
+            logger.error("Failed to authenticate with Music.app")
             print(error("Could not connect to Music.app"))
             return 1
         
         print(success("Connected to Music.app"))
+        logger.info("Successfully authenticated with Music.app")
         
         # Run analysis
         print(info("Starting temperament analysis..."))
@@ -86,8 +123,12 @@ def run_temperament_analysis(args=None):
         
         print_footer()
         return 0
+    except ValueError as e:
+        logger.error(f"Configuration error: {e}")
+        print(error(f"Configuration error: {e}"))
+        return 1
     except Exception as e:
-        logger.error(f"Temperament analysis failed: {e}")
+        logger.error(f"Temperament analysis failed: {e}", exc_info=True)
         print(error(f"Analysis failed: {e}"))
         return 1
 
@@ -115,6 +156,9 @@ def run_metadata_enrichment(args=None):
         args_ns.verbose = os.getenv('VERBOSE', 'false').lower() == 'true'
         
         if target_choice == 0:  # Playlist
+            if not require_macos("Playlist enrichment"):
+                return 1
+
             # Check if whitelist is enabled
             if whitelist_enabled and whitelist:
                 print(info(f"Whitelist enabled with {len(whitelist)} playlists"))
@@ -157,6 +201,9 @@ def run_metadata_enrichment(args=None):
 def run_playlist_organization(args=None):
     """Run plsort - playlist organization by genre."""
     print_header("📚 Playlist Organization", "Classify & Organize by Genre")
+
+    if not require_macos("Playlist organization"):
+        return 1
     
     try:
         if plsort_module is None:

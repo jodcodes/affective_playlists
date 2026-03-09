@@ -1,4 +1,55 @@
-# Requirements Documentation
+# Legacy Specifications (Reference Only)
+
+This folder contains legacy spec documents from the brownfield migration phase. These files are **reference and traceability only** — they document the historical context and original requirements gathering.
+
+## Why These Exist
+
+The affective_playlists project uses a spec-driven brownfield workflow (see [AGENTS.md](../../AGENTS.md)). During the migration phase, existing documentation was seeded into the system. Legacy specs here served as inputs for creating the authoritative OpenSpec specifications.
+
+## Current Source of Truth
+
+**All authoritative specifications now live in [openspec/specs/](../../openspec/specs/):**
+- [openspec/specs/metadata/spec.md](../../openspec/specs/metadata/spec.md) — Metadata enrichment behavior
+- [openspec/specs/playlists/spec.md](../../openspec/specs/playlists/spec.md) — Playlist organization behavior
+- [openspec/specs/temperament/spec.md](../../openspec/specs/temperament/spec.md) — Temperament analysis behavior
+
+## Files in This Folder
+
+### Functional Specifications
+
+- **SPEC_METADATA_ENRICHMENT.md** — Original metadata enrichment specification  
+  Legacy source for [openspec/specs/metadata/spec.md](../../openspec/specs/metadata/spec.md)
+
+- **SPEC_PLAYLIST_ORGANIZATION.md** — Original playlist organization specification  
+  Legacy source for [openspec/specs/playlists/spec.md](../../openspec/specs/playlists/spec.md)
+
+- **SPEC_TEMPERAMENT_ANALYZER.md** — Original temperament analysis specification  
+  Legacy source for [openspec/specs/temperament/spec.md](../../openspec/specs/temperament/spec.md)
+
+### Technical Specifications
+
+- **TECH_REQ_SYSTEM_ARCHITECTURE.md** — Original system architecture documentation  
+  Referenced by [docs/architecture/README.md](../architecture/README.md)
+
+## How to Use These Files
+
+1. **For understanding current behavior**: Use domain guides ([docs/domain-guides/](../domain-guides/)) and OpenSpec specs instead.
+2. **For historical traceability**: These files show the original requirements and context from the brownfield phase.
+3. **For references in code review**: Always link to OpenSpec specs, not legacy specs.
+
+## Migration Status
+
+- ✅ Metadata enrichment specification migrated to OpenSpec
+- ✅ Playlist organization specification migrated to OpenSpec
+- ✅ Temperament analysis specification migrated to OpenSpec
+- ✅ System architecture documented in [docs/architecture/](../architecture/)
+- ✅ Domain guides created with OpenSpec references
+
+## Related Documentation
+
+- [Domain Guides](../domain-guides/) — Modern feature-specific documentation
+- [Architecture Guide](../architecture/) — Current system design
+- [OpenSpec](../../openspec/) — Source of truth for all specs
 
 This folder contains all functional specifications and technical requirements for the affective_playlists system.
 
@@ -112,7 +163,7 @@ All implementations must meet these non-functional requirements:
 - Reports and summaries: See `docs/summary/` folder
 - Architecture overview: See `docs/OVERVIEW.md`
 - Code quality standards: See `docs/rules/CODE_QUALITY_STANDARDS.md`
-- Development roadmap: See `NEXT_STEPS.md`
+- Development roadmap: See `../../NEXT_STEPS.md`
 
 ---
 

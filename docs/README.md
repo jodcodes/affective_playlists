@@ -1,89 +1,108 @@
 # Documentation
 
-This folder contains all documentation for the affective_playlists project.
+This folder contains all documentation for the affective_playlists project, organized around the spec-driven brownfield workflow.
 
 ## Folder Structure
 
 ```
 docs/
-├── README.md                         # This file
-├── OVERVIEW.md                       # Project summary and architecture
-├── requirements/                     # Specifications and technical requirements
-│   ├── README.md                     # Requirements index
-│   ├── SPEC_TEMPERAMENT_ANALYZER.md  # Functional spec for 4tempers
-│   ├── SPEC_METADATA_ENRICHMENT.md   # Functional spec for metadata enrichment
-│   ├── SPEC_PLAYLIST_ORGANIZATION.md # Functional spec for playlist organization
-│   └── TECH_REQ_SYSTEM_ARCHITECTURE.md # Technical system architecture
-├── rules/                            # Documentation rules and standards
-│   ├── DOCUMENTATION_STANDARDS.md    # Standards for writing specifications
-│   └── TEST_ORGANIZATION_RULE.md     # Test file organization rules
-└── summary/                          # Reports, summaries, and quick references
-    ├── README.md                     # Summary index
-    ├── IMPLEMENTATION_REPORTS/       # Implementation reports
-    │   └── METADATA_ENRICHMENT_REPORT.md
-    ├── PROJECT_SUMMARIES/            # Project status and roadmaps
-    │   ├── UPDATE_SUMMARY.md         # Documentation updates summary
-    │   └── ROADMAP_SUMMARY.md        # Development roadmap
-    └── QUICK_REFERENCE/              # Quick reference guides
-        └── TESTING_QUICK_REFERENCE.md
+├── README.md                          # This file
+├── OVERVIEW.md                        # Project summary and quick-start guide
+├── domain-guides/                     # Feature domain documentation (source of truth)
+│   ├── README.md                      # Domain guides index
+│   ├── metadata/                      # Metadata enrichment domain (metad_enr)
+│   ├── playlists/                     # Playlist organization domain (plsort)
+│   └── temperament/                   # Temperament analysis domain (4tempers)
+├── architecture/                      # System architecture and technical design
+│   └── README.md                      # High-level system overview
+├── project-management/                # Operational planning and prioritization
+│   ├── README.md                      # Planning docs index
+│   ├── fix_plan.md                    # Priority-based task list
+│   ├── spec_debt.md                   # Specification coverage gaps
+│   └── NEXT_STEPS.md                  # 30-90 day development directions
+├── legacy-specs/                      # Brownfield migration reference
+│   ├── README.md                      # Legacy specs index and traceability
+│   ├── SPEC_METADATA_ENRICHMENT.md    # Original spec (reference only)
+│   ├── SPEC_PLAYLIST_ORGANIZATION.md  # Original spec (reference only)
+│   ├── SPEC_TEMPERAMENT_ANALYZER.md   # Original spec (reference only)
+│   └── TECH_REQ_SYSTEM_ARCHITECTURE.md # Original architecture spec
+├── archived-reports/                  # Historical project status reports
+│   ├── README.md                      # Archive index and timeline
+│   ├── WORK_SUMMARY_JAN4_2026.md      # January development summary
+│   ├── DOCUMENTATION_REORGANIZATION_SUMMARY.md # Brownfield bootstrap summary
+│   ├── FINAL_IMPLEMENTATION_SUMMARY.md # Complete implementation snapshot
+│   └── GITHUB_CLONEABLE.md            # GitHub distribution readiness
+├── reference-reports/                 # Implementation analysis and metrics
+│   ├── README.md                      # Reports index
+│   └── IMPLEMENTATION_REPORTS/        # Detailed feature analysis
+│       ├── METADATA_ENRICHMENT_REPORT.md
+│       └── ...
+├── rules/                             # Coding and documentation standards
+│   ├── CODE_QUALITY_STANDARDS.md      # Python code quality requirements
+│   ├── DOCUMENTATION_STANDARDS.md     # Documentation authoring standards
+│   ├── MARKDOWN_FILE_ORGANIZATION.md  # Markdown structure guidelines
+│   ├── SETUP_RULE.md                  # Setup and installation rules
+│   ├── TEST_ORGANIZATION_RULE.md      # Test file organization rules
+│   └── README.md                      # Rules index
+└── summary/                           # Quick references and project resources
+    ├── README.md                      # Summary index
+    ├── SRC_ARCHITECTURE_GUIDE.md      # Source code organization reference
+    ├── PROJECT_SUMMARIES/             # Project status resources
+    ├── QUICK_REFERENCE/               # Quick reference guides
+    └── QUICK_REFERENCE/
+        ├── CLI_UI_QUICK_REFERENCE.md
+        ├── TESTING_QUICK_REFERENCE.md
+        └── ...
 ```
 
-## Key Documents
+## Navigation Guide
 
-### Overview
-- **OVERVIEW.md** - Project summary, architecture overview, and features
+### For Feature Implementation
+Start with [Domain Guides](domain-guides/) — these explain each feature's behavior with links to authoritative OpenSpec specifications:
+- [Metadata Enrichment](domain-guides/metadata/) — `metad_enr` feature
+- [Playlist Organization](domain-guides/playlists/) — `plsort` feature  
+- [Temperament Analysis](domain-guides/temperament/) — `4tempers` feature
 
-### Requirements (docs/requirements/)
-Detailed functional and technical specifications for each component.
+### For System Design
+See [Architecture](architecture/) for high-level system design, component organization, and data flow.
 
-**Functional Specifications:**
-- **SPEC_TEMPERAMENT_ANALYZER.md** - 4tempers AI emotion classification
-- **SPEC_METADATA_ENRICHMENT.md** - Metadata enrichment functionality
-- **SPEC_PLAYLIST_ORGANIZATION.md** - Playlist organization by genre
+### For Development Planning
+Check [Project Management](project-management/) for operational priorities:
+- [fix_plan.md](project-management/fix_plan.md) — Priority-based task list
+- [spec_debt.md](project-management/spec_debt.md) — Specification gaps to address
+- [NEXT_STEPS.md](project-management/NEXT_STEPS.md) — 30-90 day roadmap
 
-**Technical Requirements:**
-- **TECH_REQ_SYSTEM_ARCHITECTURE.md** - System design, APIs, and integration
+### For Technical Analysis
+Reference [Reports](reference-reports/) for implementation analysis with metrics:
+- Feature implementation compliance reports
+- Performance baselines and metrics
+- Test coverage and passing rates
 
-### Rules (docs/rules/)
-Guidelines and standards for the project.
+### For Historical Context
+[Archived Reports](archived-reports/) contains project snapshots from January 2026 brownfield phase.
 
-- **README.md** - Overview of all rules
-- **SETUP_RULE.md** - Virtual environment setup and activation (⚠️ Start here)
-- **DOCUMENTATION_STANDARDS.md** - How to create and maintain specifications
-- **TEST_ORGANIZATION_RULE.md** - Test file organization requirements
+### For Coding & Documentation Standards
+[Rules](rules/) defines project standards:
+- [CODE_QUALITY_STANDARDS.md](rules/CODE_QUALITY_STANDARDS.md) — Python code requirements
+- [DOCUMENTATION_STANDARDS.md](rules/DOCUMENTATION_STANDARDS.md) — How to write specs
+- [TEST_ORGANIZATION_RULE.md](rules/TEST_ORGANIZATION_RULE.md) — Test file structure
 
-### Summary (docs/summary/)
-Reports, implementation guides, quick references, and architecture guides.
+### For Quick References
+[Summary](summary/) contains quick-lookup guides and project resources:
+- SRC_ARCHITECTURE_GUIDE.md — Source code organization
+- QUICK_REFERENCE/ — CLI, testing, and troubleshooting guides
+- PROJECT_SUMMARIES/ — Status and roadmap information
 
-- **SRC_ARCHITECTURE_GUIDE.md** - Source code organization and architecture overview
-- **PROJECT_SUMMARIES/** - Status summaries and roadmaps
-  - **SETUP_STATUS_SUMMARY.md** - Current setup and configuration status
-  - **UPDATE_SUMMARY.md** - Recent documentation updates
-  - **ROADMAP_SUMMARY.md** - Development roadmap and next steps
-- **IMPLEMENTATION_REPORTS/** - Feature implementation analysis
-  - **METADATA_ENRICHMENT_REPORT.md** - Detailed implementation report
-- **QUICK_REFERENCE/** - Quick lookup guides
-  - **SSL_CERTIFICATE_FIX_QUICK_REFERENCE.md** - SSL troubleshooting
-  - **TESTING_QUICK_REFERENCE.md** - Quick testing guide
+## Source of Truth Hierarchy
 
-## Quick Links
+1. **OpenSpec** (`openspec/specs/`) — Authoritative behavior specifications
+2. **Domain Guides** (`domain-guides/`) — Explain specs with implementation context
+3. **Architecture** (`architecture/`) — System-level design
+4. **Legacy Specs** (`legacy-specs/`) — Historical reference only
 
-- **Main README**: See `../README.md`
-- **Quick Start**: See `../QUICKSTART.md`
-- **Main Entry Point**: See `../main.py`
-- **Source Code**: See `../src/`
+## Project Overview
 
-## Creating New Documentation
+For project introduction and setup, see:
+- **[OVERVIEW.md](OVERVIEW.md)** — Project summary, features, and quick start
+- **[INSTALLATION.md](INSTALLATION.md)** — Detailed installation instructions
 
-Follow the standards in `rules/DOCUMENTATION_STANDARDS.md`:
-
-1. Create functional specs and technical requirements as separate `.md` files
-2. Store specs in `requirements/` folder with naming convention:
-   - Functional specs: `SPEC_*.md`
-   - Technical requirements: `TECH_REQ_*.md`
-3. Store reports in `summary/IMPLEMENTATION_REPORTS/*.md`
-4. Store summaries in `summary/PROJECT_SUMMARIES/*.md`
-5. Store quick references in `summary/QUICK_REFERENCE/*_QUICK_REFERENCE.md`
-6. Include references to related source files from `src/` and `main.py`
-
-See `rules/DOCUMENTATION_STANDARDS.md` for complete guidelines.

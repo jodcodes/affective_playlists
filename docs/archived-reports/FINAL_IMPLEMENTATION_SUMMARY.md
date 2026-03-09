@@ -27,7 +27,7 @@ Features:
 
 **Usage**:
 ```bash
-git clone https://github.com/sokkohai/affective_playlists.git
+git clone https://github.com/jodcodes/affective_playlists.git
 cd affective_playlists
 bash install.sh
 ```
@@ -123,7 +123,7 @@ bash install.sh
 
 ### Installation Process (Under 5 Minutes)
 ```bash
-$ git clone https://github.com/sokkohai/affective_playlists.git
+$ git clone https://github.com/jodcodes/affective_playlists.git
 $ cd affective_playlists
 $ bash install.sh
 
@@ -293,7 +293,7 @@ affective-playlists organize     # Playlist organization
 
 1. **Clone**
    ```bash
-   git clone https://github.com/sokkohai/affective_playlists.git
+   git clone https://github.com/jodcodes/affective_playlists.git
    ```
 
 2. **Install** (Single command)

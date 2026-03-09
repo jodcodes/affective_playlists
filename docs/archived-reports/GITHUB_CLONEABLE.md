@@ -11,7 +11,7 @@ The affective_playlists project is now fully set up for GitHub distribution with
 ### Clone and Install
 
 ```bash
-git clone https://github.com/sokkohai/affective_playlists.git
+git clone https://github.com/jodcodes/affective_playlists.git
 cd affective_playlists
 bash install.sh
 ```
