@@ -1,10 +1,13 @@
 # Git ignore for affective_playlists
 todo
-#docs/
+docs/
+docs
+openspec_upstream
 
 # Examples (local use only)
 playlists_folders.json
 whitelist.json
+
 
 # Virtual environments
 venv/
