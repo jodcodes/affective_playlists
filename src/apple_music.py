@@ -368,23 +368,62 @@ end tell
         """
         script = """
 tell application "Music"
-    set folderStructure to {{}}
-    repeat with folder in folders
-        set folderStructure's (name of folder) to {}
-        repeat with playlist in playlists of folder
-            set end of folderStructure's (name of folder) to name of playlist
+    set outputLines to {}
+    set oldTID to AppleScript's text item delimiters
+    repeat with folderItem in folders
+        set folderName to name of folderItem
+        set playlistNames to {}
+        repeat with playlistItem in playlists of folderItem
+            set end of playlistNames to (name of playlistItem)
         end repeat
+
+        set AppleScript's text item delimiters to "|||"
+        set playlistText to playlistNames as text
+        set AppleScript's text item delimiters to oldTID
+
+        set end of outputLines to (folderName & "||" & playlistText)
     end repeat
-    return folderStructure
+
+    set AppleScript's text item delimiters to linefeed
+    set outputText to outputLines as text
+    set AppleScript's text item delimiters to oldTID
+    return outputText
 end tell
 """
         success, output = self._run_applescript(script)
         if not success:
             return None
 
-        # Parse folder structure from output
-        # This is complex due to AppleScript's output format
-        return None  # TODO: Implement proper parsing
+        if output is None:
+            return None
+
+        output = output.strip()
+        if not output:
+            return {}
+
+        folder_structure: Dict[str, List[str]] = {}
+        for line in output.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+
+            if '||' not in line:
+                logger.warning(f"event=folder_structure_parse_failed reason=missing_separator line={line}")
+                return None
+
+            folder_name, playlists_raw = line.split('||', 1)
+            folder_name = folder_name.strip()
+            if not folder_name:
+                logger.warning("event=folder_structure_parse_failed reason=empty_folder_name")
+                return None
+
+            playlist_names = []
+            if playlists_raw:
+                playlist_names = [p.strip() for p in playlists_raw.split('|||') if p.strip()]
+
+            folder_structure[folder_name] = playlist_names
+
+        return folder_structure
 
     def get_apple_music_version(self) -> Optional[str]:
         """Get the version of Apple Music/iTunes app."""
