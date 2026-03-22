@@ -32,7 +32,7 @@ class MockMusicClient(MusicLibraryClient):
         """Return sample playlists"""
         return [
             Playlist(
-                id="pl.001",
+                playlist_id="pl.001",
                 name="Sad Songs",
                 tracks=[
                     Track("1", "Tears in Heaven", "Eric Clapton"),
@@ -42,7 +42,7 @@ class MockMusicClient(MusicLibraryClient):
                 description="Songs for melancholic moments",
             ),
             Playlist(
-                id="pl.002",
+                playlist_id="pl.002",
                 name="Party Mix",
                 tracks=[
                     Track("4", "Happy", "Pharrell Williams", genre="Pop"),
