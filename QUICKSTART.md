@@ -115,6 +115,15 @@ LASTFM_API_KEY=your-key
 DISCOGS_TOKEN=your-token
 ```
 
+Cover art fallback order for enrichment:
+1. MusicBrainz (MBID/coverartarchive)
+2. Spotify (requires Spotify credentials)
+3. Last.fm (requires API key)
+4. Discogs (requires token)
+
+If provider credentials are missing, that source is skipped gracefully and the
+next provider is attempted.
+
 ### Whitelist Configuration
 
 Control which playlists to process in `data/config/whitelist.json`:

@@ -45,7 +45,14 @@ That's it! The script will:
    SPOTIFY_CLIENT_ID=your-id
    SPOTIFY_CLIENT_SECRET=your-secret
    LASTFM_API_KEY=your-key
+   DISCOGS_TOKEN=your-token
    ```
+
+   Cover art source behavior:
+   - MusicBrainz (CoverArtArchive): works without credentials via MBID
+   - Spotify: requires `SPOTIFY_CLIENT_ID` + `SPOTIFY_CLIENT_SECRET`
+   - Last.fm: requires `LASTFM_API_KEY`
+   - Discogs: requires `DISCOGS_TOKEN`
 
 2. **Activate environment** (every new terminal):
    ```bash

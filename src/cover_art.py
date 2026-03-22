@@ -27,6 +27,7 @@ import ssl
 import urllib.error
 import urllib.parse
 import urllib.request
+import base64
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -93,6 +94,20 @@ class CoverArtDownloader:
                 return data
         except Exception as e:
             self.logger.debug(f"Failed to fetch {url}: {e}")
+            return None
+
+    def _fetch_json(self, url: str, headers: Optional[dict] = None, data: Optional[bytes] = None) -> Optional[dict]:
+        """Fetch and decode JSON from URL."""
+        try:
+            req_headers = {'User-Agent': 'metad-fill/1.0'}
+            if headers:
+                req_headers.update(headers)
+            req = urllib.request.Request(url, headers=req_headers, data=data)
+            with urllib.request.urlopen(req, timeout=self.timeout, context=_SSL_CONTEXT) as response:
+                payload = response.read().decode('utf-8')
+                return json.loads(payload)
+        except Exception as e:
+            self.logger.debug(f"event=cover_art_json_fetch_failed url={url} error={e}")
             return None
 
     def _get_cache_path(self, url: str) -> str:
@@ -168,10 +183,53 @@ class CoverArtDownloader:
         if not album_id:
             return None
 
-        # Note: Spotify API requires authentication, so we use a direct URL approach
-        # This would require SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET from .env
-        # For now, we return None as this requires more complex setup
-        self.logger.debug("Spotify cover art requires API authentication - skipping")
+        client_id = os.environ.get('SPOTIFY_CLIENT_ID')
+        client_secret = os.environ.get('SPOTIFY_CLIENT_SECRET')
+        if not client_id or not client_secret:
+            self.logger.debug(
+                "event=cover_art_provider_skipped provider=spotify reason=missing_credentials "
+                "missing=SPOTIFY_CLIENT_ID,SPOTIFY_CLIENT_SECRET"
+            )
+            return None
+
+        auth = base64.b64encode(f"{client_id}:{client_secret}".encode('utf-8')).decode('utf-8')
+        token_data = urllib.parse.urlencode({'grant_type': 'client_credentials'}).encode('utf-8')
+        token_json = self._fetch_json(
+            "https://accounts.spotify.com/api/token",
+            headers={
+                'Authorization': f'Basic {auth}',
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            data=token_data,
+        )
+        if not token_json or not token_json.get('access_token'):
+            self.logger.debug("event=cover_art_provider_failed provider=spotify reason=token_fetch_failed")
+            return None
+
+        album_json = self._fetch_json(
+            f"https://api.spotify.com/v1/albums/{urllib.parse.quote(album_id)}",
+            headers={'Authorization': f"Bearer {token_json['access_token']}"},
+        )
+        if not album_json:
+            self.logger.debug("event=cover_art_provider_failed provider=spotify reason=album_fetch_failed")
+            return None
+
+        images = album_json.get('images', [])
+        if not images:
+            self.logger.debug("event=cover_art_provider_failed provider=spotify reason=no_images")
+            return None
+
+        image_url = images[0].get('url')
+        if not image_url:
+            return None
+
+        if self._cache_exists(image_url):
+            return self._get_cached_image(image_url)
+
+        data = self._fetch_url(image_url)
+        if data:
+            self._save_to_cache(image_url, data)
+            return data
         return None
 
     def download_from_lastfm(self, artist: str, album: str) -> Optional[bytes]:
@@ -188,9 +246,46 @@ class CoverArtDownloader:
         if not artist or not album:
             return None
 
-        # Last.fm provides image URLs in their API responses
-        # This would require LASTFM_API_KEY from .env
-        self.logger.debug("Last.fm cover art download requires API key - skipping")
+        api_key = os.environ.get('LASTFM_API_KEY')
+        if not api_key:
+            self.logger.debug(
+                "event=cover_art_provider_skipped provider=lastfm reason=missing_credentials missing=LASTFM_API_KEY"
+            )
+            return None
+
+        query = urllib.parse.urlencode(
+            {
+                'method': 'album.getinfo',
+                'api_key': api_key,
+                'artist': artist,
+                'album': album,
+                'format': 'json',
+            }
+        )
+        data = self._fetch_json(f"https://ws.audioscrobbler.com/2.0/?{query}")
+        if not data:
+            self.logger.debug("event=cover_art_provider_failed provider=lastfm reason=api_request_failed")
+            return None
+
+        images = data.get('album', {}).get('image', [])
+        image_url = None
+        for entry in reversed(images):
+            url = entry.get('#text')
+            if url:
+                image_url = url
+                break
+
+        if not image_url:
+            self.logger.debug("event=cover_art_provider_failed provider=lastfm reason=no_images")
+            return None
+
+        if self._cache_exists(image_url):
+            return self._get_cached_image(image_url)
+
+        image_data = self._fetch_url(image_url)
+        if image_data:
+            self._save_to_cache(image_url, image_data)
+            return image_data
         return None
 
     def download_from_discogs(self, discogs_id: str) -> Optional[bytes]:
@@ -206,13 +301,90 @@ class CoverArtDownloader:
         if not discogs_id:
             return None
 
-        # Discogs API requires authentication token
-        self.logger.debug("Discogs cover art requires API token - skipping")
+        token = os.environ.get('DISCOGS_TOKEN')
+        if not token:
+            self.logger.debug(
+                "event=cover_art_provider_skipped provider=discogs reason=missing_credentials missing=DISCOGS_TOKEN"
+            )
+            return None
+
+        release = self._fetch_json(
+            f"https://api.discogs.com/releases/{urllib.parse.quote(str(discogs_id))}",
+            headers={'Authorization': f'Discogs token={token}'},
+        )
+        if not release:
+            self.logger.debug("event=cover_art_provider_failed provider=discogs reason=release_fetch_failed")
+            return None
+
+        image_url = None
+        images = release.get('images', [])
+        if images:
+            image_url = images[0].get('uri') or images[0].get('uri150')
+
+        if not image_url:
+            self.logger.debug("event=cover_art_provider_failed provider=discogs reason=no_images")
+            return None
+
+        if self._cache_exists(image_url):
+            return self._get_cached_image(image_url)
+
+        image_data = self._fetch_url(image_url)
+        if image_data:
+            self._save_to_cache(image_url, image_data)
+            return image_data
+
         return None
 
-    def download(
-        self, mbid: Optional[str] = None, artist: Optional[str] = None, album: Optional[str] = None
-    ) -> Optional[bytes]:
+    def _search_spotify_album_id(self, artist: str, album: str) -> Optional[str]:
+        """Best-effort Spotify album lookup by artist+album name."""
+        client_id = os.environ.get('SPOTIFY_CLIENT_ID')
+        client_secret = os.environ.get('SPOTIFY_CLIENT_SECRET')
+        if not client_id or not client_secret or not artist or not album:
+            return None
+
+        auth = base64.b64encode(f"{client_id}:{client_secret}".encode('utf-8')).decode('utf-8')
+        token_data = urllib.parse.urlencode({'grant_type': 'client_credentials'}).encode('utf-8')
+        token_json = self._fetch_json(
+            "https://accounts.spotify.com/api/token",
+            headers={
+                'Authorization': f'Basic {auth}',
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            data=token_data,
+        )
+        access_token = token_json.get('access_token') if token_json else None
+        if not access_token:
+            return None
+
+        query = urllib.parse.quote(f"album:{album} artist:{artist}")
+        search = self._fetch_json(
+            f"https://api.spotify.com/v1/search?q={query}&type=album&limit=1",
+            headers={'Authorization': f'Bearer {access_token}'},
+        )
+        items = search.get('albums', {}).get('items', []) if search else []
+        if not items:
+            return None
+        return items[0].get('id')
+
+    def _search_discogs_release_id(self, artist: str, album: str) -> Optional[str]:
+        """Best-effort Discogs release lookup by artist+album."""
+        token = os.environ.get('DISCOGS_TOKEN')
+        if not token or not artist or not album:
+            return None
+
+        query = urllib.parse.urlencode({'artist': artist, 'release_title': album, 'type': 'release', 'per_page': 1})
+        search = self._fetch_json(
+            f"https://api.discogs.com/database/search?{query}",
+            headers={'Authorization': f'Discogs token={token}'},
+        )
+        results = search.get('results', []) if search else []
+        if not results:
+            return None
+        return str(results[0].get('id')) if results[0].get('id') else None
+    
+    def download(self, mbid: Optional[str] = None, artist: Optional[str] = None,
+                 album: Optional[str] = None, spotify_album_id: Optional[str] = None,
+                 discogs_id: Optional[str] = None) -> Optional[bytes]:
         """
         Download cover art using priority order.
 
@@ -230,15 +402,33 @@ class CoverArtDownloader:
         Returns:
             Image bytes or None
         """
-        # Try MusicBrainz first (most reliable)
+        providers = []
+
         if mbid:
-            data = self.download_from_musicbrainz(mbid)
-            if data:
-                return data
+            providers.append(("musicbrainz", lambda: self.download_from_musicbrainz(mbid)))
 
-        # Other sources would require API authentication
-        # Spotify, Last.fm, Discogs all need credentials
+        resolved_spotify_album_id = spotify_album_id or self._search_spotify_album_id(artist or "", album or "")
+        if resolved_spotify_album_id:
+            providers.append(("spotify", lambda: self.download_from_spotify(resolved_spotify_album_id)))
 
+        if artist and album:
+            providers.append(("lastfm", lambda: self.download_from_lastfm(artist, album)))
+
+        resolved_discogs_id = discogs_id or self._search_discogs_release_id(artist or "", album or "")
+        if resolved_discogs_id:
+            providers.append(("discogs", lambda: self.download_from_discogs(resolved_discogs_id)))
+
+        for provider_name, provider_fn in providers:
+            try:
+                data = provider_fn()
+                if data:
+                    self.logger.debug(f"event=cover_art_provider_success provider={provider_name}")
+                    return data
+                self.logger.debug(f"event=cover_art_provider_no_result provider={provider_name}")
+            except Exception as e:
+                self.logger.warning(f"event=cover_art_provider_failed provider={provider_name} error={e}")
+
+        self.logger.debug("event=cover_art_provider_exhausted reason=no_provider_returned_image")
         return None
 
 

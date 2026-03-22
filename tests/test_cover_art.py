@@ -132,11 +132,89 @@ class TestCoverArtDownloader(unittest.TestCase):
         self.assertEqual(result, b"image data")
 
     def test_download_fallback_without_mbid(self):
-        """Test download falls back when no MBID provided."""
-        result = self.downloader.download(mbid=None, artist="Test", album="Album")
+        """Test download returns None when fallback providers find no image."""
+        with patch.object(self.downloader, '_search_spotify_album_id', return_value=None), \
+             patch.object(self.downloader, '_search_discogs_release_id', return_value=None), \
+             patch.object(self.downloader, 'download_from_lastfm', return_value=None):
+            result = self.downloader.download(mbid=None, artist="Test", album="Album")
 
-        # Should return None without MBID (other sources skipped)
+        # Deterministic expectation: no provider can resolve an image.
         self.assertIsNone(result)
+
+    @patch.dict(os.environ, {}, clear=True)
+    def test_download_from_spotify_missing_credentials(self):
+        """Spotify download should skip cleanly without credentials."""
+        result = self.downloader.download_from_spotify("album-123")
+        self.assertIsNone(result)
+
+    @patch.dict(os.environ, {}, clear=True)
+    def test_download_from_lastfm_missing_credentials(self):
+        """Last.fm download should skip cleanly without API key."""
+        result = self.downloader.download_from_lastfm("Artist", "Album")
+        self.assertIsNone(result)
+
+    @patch.dict(os.environ, {}, clear=True)
+    def test_download_from_discogs_missing_credentials(self):
+        """Discogs download should skip cleanly without token."""
+        result = self.downloader.download_from_discogs("123")
+        self.assertIsNone(result)
+
+    @patch('cover_art.CoverArtDownloader.download_from_musicbrainz')
+    @patch('cover_art.CoverArtDownloader._search_spotify_album_id')
+    @patch('cover_art.CoverArtDownloader.download_from_spotify')
+    @patch('cover_art.CoverArtDownloader.download_from_lastfm')
+    @patch('cover_art.CoverArtDownloader._search_discogs_release_id')
+    @patch('cover_art.CoverArtDownloader.download_from_discogs')
+    def test_download_fallback_provider_chain(
+        self,
+        mock_discogs,
+        mock_discogs_search,
+        mock_lastfm,
+        mock_spotify,
+        mock_spotify_search,
+        mock_musicbrainz,
+    ):
+        """Downloader should continue to next provider until one succeeds."""
+        mock_musicbrainz.return_value = None
+        mock_spotify_search.return_value = "spotify-album-id"
+        mock_spotify.return_value = None
+        mock_lastfm.return_value = b"lastfm-image"
+        mock_discogs_search.return_value = "discogs-id"
+        mock_discogs.return_value = None
+
+        result = self.downloader.download(mbid="mbid", artist="Artist", album="Album")
+
+        self.assertEqual(result, b"lastfm-image")
+        mock_musicbrainz.assert_called_once()
+        mock_spotify.assert_called_once_with("spotify-album-id")
+        mock_lastfm.assert_called_once_with("Artist", "Album")
+
+    @patch('cover_art.CoverArtDownloader.download_from_musicbrainz')
+    @patch('cover_art.CoverArtDownloader._search_spotify_album_id')
+    @patch('cover_art.CoverArtDownloader.download_from_spotify')
+    @patch('cover_art.CoverArtDownloader.download_from_lastfm')
+    @patch('cover_art.CoverArtDownloader._search_discogs_release_id')
+    @patch('cover_art.CoverArtDownloader.download_from_discogs')
+    def test_download_fallback_when_provider_errors(
+        self,
+        mock_discogs,
+        mock_discogs_search,
+        mock_lastfm,
+        mock_spotify,
+        mock_spotify_search,
+        mock_musicbrainz,
+    ):
+        """Downloader should not crash if one provider raises an exception."""
+        mock_musicbrainz.side_effect = RuntimeError("network failure")
+        mock_spotify_search.return_value = "spotify-album-id"
+        mock_spotify.return_value = b"spotify-image"
+        mock_lastfm.return_value = None
+        mock_discogs_search.return_value = "discogs-id"
+        mock_discogs.return_value = None
+
+        result = self.downloader.download(mbid="mbid", artist="Artist", album="Album")
+
+        self.assertEqual(result, b"spotify-image")
 
 
 class TestCoverArtEmbedder(unittest.TestCase):
