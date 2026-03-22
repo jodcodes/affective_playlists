@@ -92,7 +92,13 @@ class TestEnrichOnceHierarchy(unittest.TestCase):
         orchestrator = MetadataQueryOrchestrator()
 
         # Manually add to cache
-        cache_key = ("Test Artist", "Test Song")
+        cache_key = orchestrator._build_cache_key(
+            artist="Test Artist",
+            title="Test Song",
+            duration=None,
+            enrich_once=True,
+            missing_fields=[MetadataField.GENRE],
+        )
         test_entry = MetadataEntry(
             field=MetadataField.GENRE, value="Rock", source=DatabaseSource.DISCOGS
         )
