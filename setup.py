@@ -21,7 +21,7 @@ setup(
     description="Unified music analysis and organization tool",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/sokkohai/affective_playlists",
+    url="https://github.com/jodcodes/affective_playlists",
     packages=find_packages(include=["src", "src.*"]),
     package_dir={"": "."},
     classifiers=[
