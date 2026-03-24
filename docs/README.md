@@ -54,10 +54,49 @@ docs/
         ├── TESTING_QUICK_REFERENCE.md
         └── ...
 ```
-
+```
+docs/
+├── README.md                          # This file
+├── OVERVIEW.md                        # Project summary and quick-start guide
+├── INSTALLATION.md                    # Installation instructions
+├── architecture/                      # System architecture and technical design
+│   └── README.md                      # High-level system overview
+├── domain-guides/                     # User guides by domain
+│   ├── README.md                      # Domain guides index
+│   ├── metadata/                      # Metadata enrichment domain
+│   ├── playlists/                     # Playlist organization domain
+│   └── temperament/                   # Temperament analysis domain
+├── summary/                           # Quick references and project resources
+│   ├── README.md                      # Summary index
+│   ├── SRC_ARCHITECTURE_GUIDE.md      # Source code organization reference
+│   ├── PROJECT_SUMMARIES/             # Project status resources
+│   └── QUICK_REFERENCE/               # Quick reference guides
+└── archive/                           # Internal and historical documentation
+    ├── README.md                      # Archive overview
+    ├── project-management/            # Historical planning and prioritization
+    ├── legacy-specs/                  # Original specs (reference only)
+    ├── archived-reports/              # Project status snapshots
+    ├── reference-reports/             # Implementation analysis reports
+    ├── rules/                         # Development standards
+    └── TDD_PHASE1_SUMMARY.md          # Phase 1 test-driven development
+```
 ## Navigation Guide
 
 ### For Feature Implementation
+## Quick Navigation
+
+### 📖 For Users & Getting Started
+
+- **[OVERVIEW.md](OVERVIEW.md)** — Project summary and features
+- **[INSTALLATION.md](INSTALLATION.md)** — Setup instructions  
+- **[Domain Guides](domain-guides/)** — Feature-specific documentation
+
+### 🏗️ For Developers & Architecture
+
+- **[Architecture](architecture/)** — System design and components
+- **[Summary](summary/)** — Source code organization and quick references
+
+### 🛠️ For Feature Implementation
 
 Start with **OpenSpec Specifications** — these contain authoritative requirements with implementation context:
 
@@ -107,4 +146,27 @@ Reference [Reports](reference-reports/) for implementation analysis with metrics
 For project introduction and setup, see:
 - **[OVERVIEW.md](OVERVIEW.md)** — Project summary, features, and quick start
 - **[INSTALLATION.md](INSTALLATION.md)** — Detailed installation instructions
+Start with **OpenSpec Specifications** in the main project for authoritative requirements.
+
+### 📋 For Development Planning & Analysis
+
+See [archive/](archive/) for internal documentation:
+- **[project-management/](archive/project-management/)** — Planning and priorities
+- **[reference-reports/](archive/reference-reports/)** — Implementation metrics
+- **[TDD_PHASE1_SUMMARY.md](archive/TDD_PHASE1_SUMMARY.md)** — Development phase summary
+
+### 📚 For Reference & Standards
+
+See [archive/](archive/) for coding standards and historical information:
+- **[rules/](archive/rules/)** — Code quality and documentation standards
+- **[legacy-specs/](archive/legacy-specs/)** — Original specifications (outdated)
+- **[archived-reports/](archive/archived-reports/)** — Historical project snapshots
+
+## Source of Truth
+
+1. **README.md** (root) & **OVERVIEW.md** — User-facing project information
+2. **OpenSpec Specs** (`openspec/specs/`) — Authoritative development requirements
+3. **Architecture** (`docs/architecture/`) — System design and components
+4. **Code in src/** — Implementation reference
+5. **archive/** — Historical context and planning (reference only)
 
