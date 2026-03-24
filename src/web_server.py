@@ -165,7 +165,6 @@ def _get_playlists_from_cache():
         return []
 
 
-
 def _get_playlist_classifier():
     """Initialize and return playlist classifier."""
     try:
@@ -971,15 +970,15 @@ def list_jobs():
 def run_server(host: str = WEB_HOST, port: int = WEB_PORT, debug: bool = WEB_DEBUG):
     """Start the web server."""
     logger.info(f"Starting web server on {host}:{port} (debug={debug})")
-    
+
     # Initialize database first
     logger.info("Initializing database...")
     setup_database()
-    
+
     # Initialize playlist cache from Apple Music on startup
     logger.info("Loading playlists from Apple Music...")
     _init_playlists_from_apple_music()
-    
+
     app.run(host=host, port=port, debug=debug)
 
 

@@ -133,9 +133,11 @@ class TestCoverArtDownloader(unittest.TestCase):
 
     def test_download_fallback_without_mbid(self):
         """Test download returns None when fallback providers find no image."""
-        with patch.object(self.downloader, '_search_spotify_album_id', return_value=None), \
-             patch.object(self.downloader, '_search_discogs_release_id', return_value=None), \
-             patch.object(self.downloader, 'download_from_lastfm', return_value=None):
+        with (
+            patch.object(self.downloader, "_search_spotify_album_id", return_value=None),
+            patch.object(self.downloader, "_search_discogs_release_id", return_value=None),
+            patch.object(self.downloader, "download_from_lastfm", return_value=None),
+        ):
             result = self.downloader.download(mbid=None, artist="Test", album="Album")
 
         # Deterministic expectation: no provider can resolve an image.
@@ -159,12 +161,12 @@ class TestCoverArtDownloader(unittest.TestCase):
         result = self.downloader.download_from_discogs("123")
         self.assertIsNone(result)
 
-    @patch('src.cover_art.CoverArtDownloader.download_from_musicbrainz')
-    @patch('src.cover_art.CoverArtDownloader._search_spotify_album_id')
-    @patch('src.cover_art.CoverArtDownloader.download_from_spotify')
-    @patch('src.cover_art.CoverArtDownloader.download_from_lastfm')
-    @patch('src.cover_art.CoverArtDownloader._search_discogs_release_id')
-    @patch('src.cover_art.CoverArtDownloader.download_from_discogs')
+    @patch("src.cover_art.CoverArtDownloader.download_from_musicbrainz")
+    @patch("src.cover_art.CoverArtDownloader._search_spotify_album_id")
+    @patch("src.cover_art.CoverArtDownloader.download_from_spotify")
+    @patch("src.cover_art.CoverArtDownloader.download_from_lastfm")
+    @patch("src.cover_art.CoverArtDownloader._search_discogs_release_id")
+    @patch("src.cover_art.CoverArtDownloader.download_from_discogs")
     def test_download_fallback_provider_chain(
         self,
         mock_discogs,
@@ -189,12 +191,12 @@ class TestCoverArtDownloader(unittest.TestCase):
         mock_spotify.assert_called_once_with("spotify-album-id")
         mock_lastfm.assert_called_once_with("Artist", "Album")
 
-    @patch('src.cover_art.CoverArtDownloader.download_from_musicbrainz')
-    @patch('src.cover_art.CoverArtDownloader._search_spotify_album_id')
-    @patch('src.cover_art.CoverArtDownloader.download_from_spotify')
-    @patch('src.cover_art.CoverArtDownloader.download_from_lastfm')
-    @patch('src.cover_art.CoverArtDownloader._search_discogs_release_id')
-    @patch('src.cover_art.CoverArtDownloader.download_from_discogs')
+    @patch("src.cover_art.CoverArtDownloader.download_from_musicbrainz")
+    @patch("src.cover_art.CoverArtDownloader._search_spotify_album_id")
+    @patch("src.cover_art.CoverArtDownloader.download_from_spotify")
+    @patch("src.cover_art.CoverArtDownloader.download_from_lastfm")
+    @patch("src.cover_art.CoverArtDownloader._search_discogs_release_id")
+    @patch("src.cover_art.CoverArtDownloader.download_from_discogs")
     def test_download_fallback_when_provider_errors(
         self,
         mock_discogs,

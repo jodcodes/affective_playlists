@@ -491,11 +491,13 @@ end tell
             if not line:
                 continue
 
-            if '||' not in line:
-                logger.warning(f"event=folder_structure_parse_failed reason=missing_separator line={line}")
+            if "||" not in line:
+                logger.warning(
+                    f"event=folder_structure_parse_failed reason=missing_separator line={line}"
+                )
                 return None
 
-            folder_name, playlists_raw = line.split('||', 1)
+            folder_name, playlists_raw = line.split("||", 1)
             folder_name = folder_name.strip()
             if not folder_name:
                 logger.warning("event=folder_structure_parse_failed reason=empty_folder_name")
@@ -503,7 +505,7 @@ end tell
 
             playlist_names = []
             if playlists_raw:
-                playlist_names = [p.strip() for p in playlists_raw.split('|||') if p.strip()]
+                playlist_names = [p.strip() for p in playlists_raw.split("|||") if p.strip()]
 
             folder_structure[folder_name] = playlist_names
 

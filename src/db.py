@@ -117,7 +117,9 @@ class Playlist(Base):
     # Status tracking
     classified = Column(String(50), nullable=True, default=None)  # genre classification result
     enriched = Column(String(50), default="pending")  # pending, in_progress, completed, failed
-    last_synced = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_synced = Column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
     last_modified = Column(DateTime, nullable=True)
 
     def __repr__(self):

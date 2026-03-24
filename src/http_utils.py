@@ -52,7 +52,9 @@ class HttpClient:
         for attempt in range(self.retries + 1):
             try:
                 req = urllib.request.Request(url, headers=req_headers, data=data)
-                with urllib.request.urlopen(req, timeout=timeout, context=self.ssl_context) as response:
+                with urllib.request.urlopen(
+                    req, timeout=timeout, context=self.ssl_context
+                ) as response:
                     return response.read()
             except urllib.error.HTTPError as e:
                 last_error = e
