@@ -11,8 +11,8 @@ pip install flask>=3.0.0
 ## Running the Server
 
 ```bash
-# Start web server on localhost:5000
-python -m src.web_server
+# Start web server on 127.0.0.1:4000
+./venv/bin/python -m src.web_server
 
 # Or with custom port
 WEB_PORT=8000 python -m src.web_server
@@ -21,7 +21,7 @@ WEB_PORT=8000 python -m src.web_server
 WEB_DEBUG=true python -m src.web_server
 ```
 
-Then open `http://localhost:5000` in your browser.
+Then open `http://127.0.0.1:4000` in your browser.
 
 ## Features
 
@@ -41,8 +41,8 @@ See [openspec/changes/browser-frontend/spec.md](../../openspec/changes/browser-f
 
 ## Environment Variables
 
-- `WEB_HOST` - Bind address (default: localhost)
-- `WEB_PORT` - Server port (default: 5000)
+- `WEB_HOST` - Bind address (default: 127.0.0.1)
+- `WEB_PORT` - Server port (default: 4000)
 - `WEB_DEBUG` - Debug mode (default: false)
 
 ## Architecture

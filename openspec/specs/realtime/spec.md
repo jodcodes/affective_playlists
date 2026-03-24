@@ -55,7 +55,7 @@ Real-Time Updates SHALL provide WebSocket-based push notifications for live job 
 Clients MUST be able to establish WebSocket connection to server.
 
 #### Scenario: WebSocket handshake succeeds
-- GIVEN client opens WebSocket to ws://localhost:5000/socket.io/
+- GIVEN client opens WebSocket to ws://127.0.0.1:4000/socket.io/
 - WHEN connection handshake occurs
 - THEN server SHALL:
   - Accept connection with 101 Switching Protocols

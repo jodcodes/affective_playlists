@@ -95,7 +95,7 @@ def show_menu():
 def start_flask():
     """Start Flask development server."""
     print("\n🚀 Starting Flask web server...")
-    print("   URL: http://localhost:5000")
+    print("   URL: http://127.0.0.1:4000")
     print("   Press Ctrl+C to stop\n")
 
     os.environ["FLASK_APP"] = "src.web_server"
@@ -148,7 +148,7 @@ def start_full_stack():
     print("  Terminal 2 - Run: celery -A src.celery_app worker -l info")
     print("  Terminal 3 (optional) - Run: celery -A src.celery_app events")
     print("\nThen:")
-    print("  • Open browser: http://localhost:5000")
+    print("  • Open browser: http://127.0.0.1:4000")
     print("  • Submit enrichment job")
     print("  • Watch progress in real-time")
 
@@ -197,8 +197,8 @@ def show_environment():
     print(f"  Database:   {os.getenv('DATABASE_URL', 'sqlite:///jobs.db')}")
     print(f"  Celery Broker: {os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')}")
     print(f"  Worker Concurrency: {os.getenv('CELERY_WORKER_CONCURRENCY', '2')}")
-    print(f"  Web Host: {os.getenv('WEB_HOST', 'localhost')}")
-    print(f"  Web Port: {os.getenv('WEB_PORT', '5000')}")
+    print(f"  Web Host: {os.getenv('WEB_HOST', '127.0.0.1')}")
+    print(f"  Web Port: {os.getenv('WEB_PORT', '4000')}")
     print("\n  Environment variables can be set in .env file or shell:")
     print("    export DATABASE_URL=postgresql://user:pass@localhost/db")
     print("    export CELERY_BROKER_URL=redis://localhost:6379/0")

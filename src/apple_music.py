@@ -48,7 +48,11 @@ class AppleMusicInterface:
                 stderr=subprocess.PIPE,
                 text=True,
             )
-            stdout, stderr = process.communicate(input=script)
+            try:
+                stdout, stderr = process.communicate(input=script, timeout=20)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                return False, "AppleScript execution timed out after 20s"
 
             if process.returncode != 0:
                 return False, stderr
@@ -122,6 +126,32 @@ end tell
         # Return all playlists without filtering
         # (whitelist filtering is handled by the caller via shared.config module)
         return playlist_names
+
+    def get_user_playlist_names(self) -> Optional[List[str]]:
+        """
+        Get list of user playlists only (exclude system/library playlists and folders).
+
+        Returns:
+            List of user playlist names or empty list if failed
+        """
+        script = """
+tell application "Music"
+    set playlistNames to {}
+    try
+        repeat with pl in (every user playlist)
+            set end of playlistNames to name of pl
+        end repeat
+        return playlistNames
+    on error
+        return {}
+    end try
+end tell
+"""
+        success, output = self._run_applescript(script)
+        if not success or not output:
+            return []
+
+        return [name.strip() for name in output.split(",") if name.strip()]
 
     def is_folder(self, item_name: str) -> bool:
         """Check if an item is a folder (True) or playlist (False)."""

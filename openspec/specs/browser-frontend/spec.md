@@ -2,11 +2,11 @@
 
 ## Context & Implementation Guide
 
-Browser Frontend replaces the CLI TUI with a lightweight, responsive HTML5 web interface running on localhost. The system communicates with the Python backend via REST API and provides real-time feedback, interactive workflows, and persistent state management. The interface prioritizes speed and clarity over complex styling while remaining visually engaging.
+Browser Frontend replaces the CLI TUI with a lightweight, responsive HTML5 web interface running on the loopback interface. The system communicates with the Python backend via REST API and provides real-time feedback, interactive workflows, and persistent state management. The interface prioritizes speed and clarity over complex styling while remaining visually engaging.
 
 ### Core Features
 
-- **Web-based interface**: Single-page application served on localhost (default: http://localhost:5000)
+- **Web-based interface**: Single-page application served on loopback (default: http://127.0.0.1:4000)
 - **REST API communication**: Clean HTTP endpoints for all backend operations
 - **Dashboard view**: Overview of library statistics, recent actions, and system status
 - **Playlist management**: View, classify, organize, and move playlists with visual feedback
@@ -32,8 +32,8 @@ Browser Frontend replaces the CLI TUI with a lightweight, responsive HTML5 web i
 ### Configuration
 
 - Environment variables:
-  - `WEB_HOST` - Server bind address (default: localhost)
-  - `WEB_PORT` - Server port (default: 5000)
+  - `WEB_HOST` - Server bind address (default: 127.0.0.1)
+  - `WEB_PORT` - Server port (default: 4000)
   - `WEB_DEBUG` - Debug mode (default: false in production)
 - Browser localStorage keys:
   - `affective_theme` - 'dark' | 'light'
@@ -89,12 +89,12 @@ Core endpoints for frontend communication:
 Browser Frontend SHALL provide lightweight web-based interface for all affective_playlists operations with real-time feedback, clear workflows, and persistent user preferences.
 
 ### Requirement: Server Startup
-The system MUST start web server on localhost with predictable port.
+The system MUST start web server on loopback with predictable port.
 
 #### Scenario: Server starts successfully
 - GIVEN Python backend is installed and dependencies available
 - WHEN frontend server is started (via `python -m src.web_server` or similar)
-- THEN the system SHALL bind to configured host:port (default localhost:5000)
+- THEN the system SHALL bind to configured host:port (default 127.0.0.1:4000)
 - AND serve index.html at root URL
 - AND all static assets (CSS, JS) MUST be accessible
 
@@ -114,7 +114,7 @@ The system MUST start web server on localhost with predictable port.
 The frontend MUST display library overview with key metrics and quick actions.
 
 #### Scenario: Dashboard loads on startup
-- GIVEN user opens browser to localhost:5000
+- GIVEN user opens browser to 127.0.0.1:4000
 - WHEN page loads
 - THEN dashboard SHALL show:
   - Total playlists count
@@ -271,7 +271,7 @@ The system MUST support dark/light mode toggle with localStorage persistence.
 - AND show visual confirmation (button state changes)
 
 #### Scenario: Load saved theme on return visit
-- GIVEN user visits browser to localhost:5000
+- GIVEN user visits browser to 127.0.0.1:4000
 - WHEN page loads
 - THEN check localStorage for 'affective_theme'
 - AND apply saved theme (or default to 'light' if not set)
@@ -320,7 +320,7 @@ The system MUST work across device sizes without layout breaking.
 The system MUST load quickly and remain responsive.
 
 #### Scenario: Initial page load
-- GIVEN user opens localhost:5000 in new tab
+- GIVEN user opens 127.0.0.1:4000 in new tab
 - WHEN page loads
 - THEN HTML + CSS + JS bundle MUST load in < 3 seconds
 - AND dashboard MUST be interactive within 5 seconds (with API calls)

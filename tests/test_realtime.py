@@ -24,7 +24,7 @@ class TestWebSocketConnection:
 
     def test_websocket_handshake_succeeds(self):
         """WebSocket handshake should return 101 Switching Protocols."""
-        # Client: ws://localhost:5000/socket.io/
+        # Client: ws://127.0.0.1:4000/socket.io/
         # Server: 101 Switching Protocols
         # Response: {"type": "connect", "session_id": "sid-123..."}
         assert True  # Placeholder

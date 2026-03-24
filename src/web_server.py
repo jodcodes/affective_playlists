@@ -47,8 +47,8 @@ app = Flask(
 )
 
 # Configuration
-WEB_HOST = os.getenv("WEB_HOST", "localhost")
-WEB_PORT = int(os.getenv("WEB_PORT", "5000"))
+WEB_HOST = os.getenv("WEB_HOST", "127.0.0.1")
+WEB_PORT = int(os.getenv("WEB_PORT", "4000"))
 WEB_DEBUG = os.getenv("WEB_DEBUG", "false").lower() == "true"
 
 # In-memory state for background operations

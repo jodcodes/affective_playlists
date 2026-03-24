@@ -316,3 +316,43 @@ class TestCaching:
             playlist_manager_dry_run._playlist_cache["playlist1"],
             dict,
         )
+
+
+class TestFrontendPlaylistData:
+    """Tests for frontend playlist data helper methods."""
+
+    def test_get_all_playlists_returns_expected_shape(self, playlist_manager_dry_run):
+        """Playlist list should contain id/name/track_count fields for API."""
+        playlist_manager_dry_run.apple_music.get_user_playlist_names.return_value = [
+            "Playlist A",
+            "Playlist B",
+        ]
+
+        playlists = playlist_manager_dry_run.get_all_playlists()
+
+        assert len(playlists) == 2
+        assert playlists[0]["name"] == "Playlist A"
+        assert playlists[0]["track_count"] == 0
+        assert playlists[1]["name"] == "Playlist B"
+        assert playlists[1]["track_count"] == 0
+        assert "id" in playlists[0]
+
+    def test_get_playlist_details_maps_tracks_for_frontend(self, playlist_manager_dry_run):
+        """Playlist details should include normalized track objects."""
+        playlist_manager_dry_run.apple_music.get_user_playlist_names.return_value = [
+            "My Playlist"
+        ]
+        playlist_manager_dry_run.apple_music.get_playlist_tracks.side_effect = [
+            [{"title": "Song 1", "artist": "Artist 1"}],
+            [{"title": "Song 1", "artist": "Artist 1", "album": "Album 1"}],
+        ]
+
+        playlist_id = playlist_manager_dry_run._make_playlist_id("My Playlist")
+        details = playlist_manager_dry_run.get_playlist_details(playlist_id)
+
+        assert details is not None
+        assert details["name"] == "My Playlist"
+        assert details["track_count"] == 1
+        assert len(details["tracks"]) == 1
+        assert details["tracks"][0]["name"] == "Song 1"
+        assert details["tracks"][0]["artist"] == "Artist 1"

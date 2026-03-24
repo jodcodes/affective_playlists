@@ -266,7 +266,7 @@ async function loadPlaylists() {
 function renderPlaylistsTable(playlists) {
     const body = DOM.playlistsBody();
     if (!playlists || playlists.length === 0) {
-        body.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No playlists found</td></tr>';
+        body.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No playlists found. Open Music.app and allow Automation access for Terminal/Python in macOS Privacy settings.</td></tr>';
         return;
     }
 

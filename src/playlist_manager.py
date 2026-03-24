@@ -10,7 +10,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from src.apple_music import AppleMusicInterface
 from src.logger import setup_logger
@@ -365,6 +365,82 @@ end tell
         )
 
         return results
+
+    def _make_playlist_id(self, playlist_name: str) -> str:
+        """Create a stable API-safe ID when Music persistent IDs are unavailable."""
+        normalized = playlist_name.strip().lower().replace(" ", "-")
+        normalized = "".join(ch for ch in normalized if ch.isalnum() or ch in {"-", "_"})
+        return normalized or "unknown"
+
+    def get_all_playlists(self) -> List[Dict[str, Any]]:
+        """Return playlists in a shape expected by the web frontend API."""
+        playlist_names = self.apple_music.get_user_playlist_names() or []
+        playlists: List[Dict[str, Any]] = []
+        excluded_names = {
+            "music",
+            "music videos",
+            "favourite songs",
+            "favorite songs",
+        }
+
+        for name in playlist_names:
+            playlist_name = (name or "").strip()
+            if not playlist_name:
+                continue
+            if playlist_name.lower() in excluded_names:
+                continue
+
+            playlists.append(
+                {
+                    "id": self._make_playlist_id(playlist_name),
+                    "name": playlist_name,
+                    # Keep listing fast: avoid expensive per-playlist track queries here.
+                    "track_count": 0,
+                    "genre": None,
+                    "created_date": None,
+                }
+            )
+
+        return playlists
+
+    def get_playlist_details(self, playlist_id: str) -> Optional[Dict[str, Any]]:
+        """Return detailed playlist data for a frontend playlist ID."""
+        all_playlists = self.get_all_playlists()
+        target = next((p for p in all_playlists if p.get("id") == playlist_id), None)
+
+        if not target:
+            return None
+
+        playlist_name = str(target.get("name", "")).strip()
+        tracks = self.apple_music.get_playlist_tracks(playlist_name) or []
+
+        normalized_tracks = []
+        for idx, track in enumerate(tracks, start=1):
+            if not isinstance(track, dict):
+                continue
+            normalized_tracks.append(
+                {
+                    "id": f"{playlist_id}-track-{idx}",
+                    "name": track.get("title") or track.get("name") or "Unknown Track",
+                    "artist": track.get("artist") or "Unknown Artist",
+                    "metadata": {
+                        "album": track.get("album"),
+                        "genre": track.get("genre"),
+                        "bpm": track.get("bpm"),
+                        "year": track.get("year"),
+                        "composer": track.get("composer"),
+                        "duration": track.get("duration"),
+                    },
+                }
+            )
+
+        return {
+            "id": playlist_id,
+            "name": playlist_name,
+            "track_count": len(normalized_tracks),
+            "genre": target.get("genre"),
+            "tracks": normalized_tracks,
+        }
 
     def clear_cache(self):
         """Clear internal caches for folders and playlists."""

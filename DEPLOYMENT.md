@@ -77,7 +77,7 @@ python run_local.py
 ```bash
 python run_local.py
 # Select: 1 (Flask)
-# Open: http://localhost:5000
+# Open: http://127.0.0.1:4000
 ```
 
 **Option B - Web Server + Worker (full stack):**
@@ -153,7 +153,7 @@ GET  /api/jobs/{job_id}/stream      # SSE stream for real-time updates
 
 **Start enrichment job:**
 ```bash
-curl -X POST http://localhost:5000/api/enrichment/start \
+curl -X POST http://127.0.0.1:4000/api/enrichment/start \
   -H "Content-Type: application/json" \
   -d '{"playlist_ids": ["pl-1", "pl-2"], "sources": ["spotify"]}'
 
@@ -168,7 +168,7 @@ curl -X POST http://localhost:5000/api/enrichment/start \
 
 **Check job status:**
 ```bash
-curl http://localhost:5000/api/jobs/enrichment-1741608660-abc123
+curl http://127.0.0.1:4000/api/jobs/enrichment-1741608660-abc123
 
 # Response:
 {
@@ -184,7 +184,7 @@ curl http://localhost:5000/api/jobs/enrichment-1741608660-abc123
 
 **Stream real-time updates:**
 ```bash
-curl -N http://localhost:5000/api/jobs/enrichment-1741608660-abc123/stream
+curl -N http://127.0.0.1:4000/api/jobs/enrichment-1741608660-abc123/stream
 
 # Receives Server-Sent Events (SSE):
 # data: {"event": "job:progress", "progress": 50, ...}
@@ -363,8 +363,8 @@ CELERY_RESULT_BACKEND=redis://localhost:6379/1
 CELERY_WORKER_CONCURRENCY=2
 
 # Web Server
-WEB_HOST=localhost
-WEB_PORT=5000
+WEB_HOST=127.0.0.1
+WEB_PORT=4000
 WEB_DEBUG=false
 
 # Rate Limiting
