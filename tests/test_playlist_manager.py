@@ -323,31 +323,39 @@ class TestFrontendPlaylistData:
 
     def test_get_all_playlists_returns_expected_shape(self, playlist_manager_dry_run):
         """Playlist list should contain id/name/track_count fields for API."""
-        playlist_manager_dry_run.apple_music.get_user_playlist_names.return_value = [
-            "Playlist A",
-            "Playlist B",
+        playlist_manager_dry_run.apple_music.get_user_playlists_with_counts.return_value = [
+            {"name": "Playlist A", "track_count": 12},
+            {"name": "Playlist B", "track_count": 7},
         ]
+        playlist_manager_dry_run.apple_music.get_playlist_ids.return_value = {
+            "Playlist A": "A1B2C3D4E5F60708",
+            "Playlist B": "0011223344556677",
+        }
 
         playlists = playlist_manager_dry_run.get_all_playlists()
 
         assert len(playlists) == 2
         assert playlists[0]["name"] == "Playlist A"
-        assert playlists[0]["track_count"] == 0
+        assert playlists[0]["id"] == "A1B2C3D4E5F60708"
+        assert playlists[0]["track_count"] == 12
         assert playlists[1]["name"] == "Playlist B"
-        assert playlists[1]["track_count"] == 0
-        assert "id" in playlists[0]
+        assert playlists[1]["id"] == "0011223344556677"
+        assert playlists[1]["track_count"] == 7
 
     def test_get_playlist_details_maps_tracks_for_frontend(self, playlist_manager_dry_run):
         """Playlist details should include normalized track objects."""
-        playlist_manager_dry_run.apple_music.get_user_playlist_names.return_value = [
-            "My Playlist"
+        playlist_manager_dry_run.apple_music.get_user_playlists_with_counts.return_value = [
+            {"name": "My Playlist", "track_count": 1}
         ]
+        playlist_manager_dry_run.apple_music.get_playlist_ids.return_value = {
+            "My Playlist": "ABCDEF0123456789"
+        }
         playlist_manager_dry_run.apple_music.get_playlist_tracks.side_effect = [
             [{"title": "Song 1", "artist": "Artist 1"}],
             [{"title": "Song 1", "artist": "Artist 1", "album": "Album 1"}],
         ]
 
-        playlist_id = playlist_manager_dry_run._make_playlist_id("My Playlist")
+        playlist_id = "ABCDEF0123456789"
         details = playlist_manager_dry_run.get_playlist_details(playlist_id)
 
         assert details is not None
