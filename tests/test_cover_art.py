@@ -159,12 +159,12 @@ class TestCoverArtDownloader(unittest.TestCase):
         result = self.downloader.download_from_discogs("123")
         self.assertIsNone(result)
 
-    @patch('cover_art.CoverArtDownloader.download_from_musicbrainz')
-    @patch('cover_art.CoverArtDownloader._search_spotify_album_id')
-    @patch('cover_art.CoverArtDownloader.download_from_spotify')
-    @patch('cover_art.CoverArtDownloader.download_from_lastfm')
-    @patch('cover_art.CoverArtDownloader._search_discogs_release_id')
-    @patch('cover_art.CoverArtDownloader.download_from_discogs')
+    @patch('src.cover_art.CoverArtDownloader.download_from_musicbrainz')
+    @patch('src.cover_art.CoverArtDownloader._search_spotify_album_id')
+    @patch('src.cover_art.CoverArtDownloader.download_from_spotify')
+    @patch('src.cover_art.CoverArtDownloader.download_from_lastfm')
+    @patch('src.cover_art.CoverArtDownloader._search_discogs_release_id')
+    @patch('src.cover_art.CoverArtDownloader.download_from_discogs')
     def test_download_fallback_provider_chain(
         self,
         mock_discogs,
@@ -189,12 +189,12 @@ class TestCoverArtDownloader(unittest.TestCase):
         mock_spotify.assert_called_once_with("spotify-album-id")
         mock_lastfm.assert_called_once_with("Artist", "Album")
 
-    @patch('cover_art.CoverArtDownloader.download_from_musicbrainz')
-    @patch('cover_art.CoverArtDownloader._search_spotify_album_id')
-    @patch('cover_art.CoverArtDownloader.download_from_spotify')
-    @patch('cover_art.CoverArtDownloader.download_from_lastfm')
-    @patch('cover_art.CoverArtDownloader._search_discogs_release_id')
-    @patch('cover_art.CoverArtDownloader.download_from_discogs')
+    @patch('src.cover_art.CoverArtDownloader.download_from_musicbrainz')
+    @patch('src.cover_art.CoverArtDownloader._search_spotify_album_id')
+    @patch('src.cover_art.CoverArtDownloader.download_from_spotify')
+    @patch('src.cover_art.CoverArtDownloader.download_from_lastfm')
+    @patch('src.cover_art.CoverArtDownloader._search_discogs_release_id')
+    @patch('src.cover_art.CoverArtDownloader.download_from_discogs')
     def test_download_fallback_when_provider_errors(
         self,
         mock_discogs,

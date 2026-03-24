@@ -27,7 +27,7 @@ import hashlib
 import base64
 import logging
 from typing import Optional, Tuple
-from http_utils import HttpClient
+from src.http_utils import HttpClient
 
 
 class CoverArtDownloader:

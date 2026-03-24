@@ -33,8 +33,8 @@ from typing import Dict, List, Optional, Tuple
 import logging
 import time
 from abc import ABC, abstractmethod
-from metadata_enrichment import MetadataField, DatabaseSource, MetadataEntry
-from http_utils import HttpClient
+from src.metadata_enrichment import MetadataField, DatabaseSource, MetadataEntry
+from src.http_utils import HttpClient
 
 
 class DatabaseQuery(ABC):
