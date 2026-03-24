@@ -374,7 +374,8 @@ end tell
 
     def get_all_playlists(self) -> List[Dict[str, Any]]:
         """Return playlists in a shape expected by the web frontend API."""
-        playlist_names = self.apple_music.get_user_playlist_names() or []
+        playlist_rows = self.apple_music.get_user_playlists_with_counts() or []
+        playlist_ids = self.apple_music.get_playlist_ids() or {}
         playlists: List[Dict[str, Any]] = []
         excluded_names = {
             "music",
@@ -383,19 +384,27 @@ end tell
             "favorite songs",
         }
 
-        for name in playlist_names:
-            playlist_name = (name or "").strip()
+        # Fallback for older interface behavior: names without precomputed counts.
+        if not playlist_rows:
+            playlist_rows = [
+                {"name": name, "track_count": 0}
+                for name in (self.apple_music.get_user_playlist_names() or [])
+            ]
+
+        for row in playlist_rows:
+            playlist_name = str(row.get("name", "")).strip()
             if not playlist_name:
                 continue
             if playlist_name.lower() in excluded_names:
                 continue
+            track_count = int(row.get("track_count", 0) or 0)
 
             playlists.append(
                 {
-                    "id": self._make_playlist_id(playlist_name),
+                    # Prefer persistent IDs from AppleScript files for stable identity.
+                    "id": playlist_ids.get(playlist_name, self._make_playlist_id(playlist_name)),
                     "name": playlist_name,
-                    # Keep listing fast: avoid expensive per-playlist track queries here.
-                    "track_count": 0,
+                    "track_count": track_count,
                     "genre": None,
                     "created_date": None,
                 }
