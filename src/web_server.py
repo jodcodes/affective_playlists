@@ -84,6 +84,7 @@ _temperament_results: List[Dict[str, Any]] = []
 # Cached playlists and settings
 _playlists_cache: List[Dict[str, Any]] = []
 _user_settings: Dict[str, Any] = {}
+_db_session = None  # DB session for playlist cache
 
 
 def _get_playlist_manager():
@@ -95,6 +96,74 @@ def _get_playlist_manager():
     except Exception as e:
         logger.warning(f"Failed to initialize PlaylistManager: {e}")
         return None
+
+
+def _init_playlists_from_apple_music():
+    """Load playlists from Apple Music on server start and cache to DB."""
+    global _playlists_cache
+    try:
+        from src.db import init_db, Playlist
+
+        pm = _get_playlist_manager()
+        if not pm:
+            logger.warning("PlaylistManager not available for initial load")
+            return
+
+        # Get playlists from Apple Music
+        playlists = pm.get_all_playlists() or []
+        logger.info(f"Loading {len(playlists)} playlists from Apple Music into cache")
+
+        if not playlists:
+            logger.warning("No playlists returned from Apple Music")
+            return
+
+        # Store in DB using session from init_db
+        _, SessionLocal = init_db()
+        session = SessionLocal()
+
+        try:
+            # Clear old playlists
+            session.query(Playlist).delete()
+            session.commit()
+
+            # Insert new playlists
+            for p in playlists:
+                playlist = Playlist(
+                    persistent_id=str(p.get("id", "")),
+                    name=str(p.get("name", "Unnamed")),
+                    track_count=int(p.get("track_count", 0)),
+                    genre=p.get("genre"),
+                    created_date=p.get("created_date"),
+                )
+                session.add(playlist)
+
+            session.commit()
+            _playlists_cache = playlists
+            logger.info(f"Successfully cached {len(playlists)} playlists to DB")
+        except Exception as e:
+            logger.error(f"Failed to save playlists to DB: {e}")
+            session.rollback()
+        finally:
+            session.close()
+
+    except Exception as e:
+        logger.error(f"Failed to initialize playlists: {e}")
+
+
+def _get_playlists_from_cache():
+    """Retrieve playlists from database cache."""
+    try:
+        from src.db import Playlist, get_session
+
+        session = get_session()
+        playlists = session.query(Playlist).all()
+        result = [p.to_dict() for p in playlists]
+        session.close()
+        return result
+    except Exception as e:
+        logger.error(f"Failed to get playlists from cache: {e}")
+        return []
+
 
 
 def _get_playlist_classifier():
@@ -199,7 +268,7 @@ def config():
 @app.route("/api/playlists", methods=["GET"])
 def get_playlists():
     """
-    List all playlists with metadata.
+    List all playlists with metadata (from cache).
 
     Returns:
       [
@@ -215,31 +284,9 @@ def get_playlists():
       ]
     """
     try:
-        pm = _get_playlist_manager()
-
-        if not pm:
-            # Return mock data if PlaylistManager not available
-            return jsonify([])
-
-        if hasattr(pm, "get_all_playlists"):
-            playlists = pm.get_all_playlists()
-            # Ensure each playlist has required fields
-            result = []
-            for p in playlists:
-                if isinstance(p, dict):
-                    result.append(
-                        {
-                            "id": p.get("id", "unknown"),
-                            "name": p.get("name", "Unnamed"),
-                            "track_count": p.get("track_count", 0),
-                            "genre": p.get("genre"),  # Optional
-                            "classified": "genre" in p and p.get("genre") is not None,
-                            "created_date": p.get("created_date"),
-                        }
-                    )
-            return jsonify(result)
-
-        return jsonify([])
+        # Serve from database cache (loaded on server startup)
+        playlists = _get_playlists_from_cache()
+        return jsonify(playlists)
     except Exception as e:
         logger.error(f"Failed to get playlists: {e}")
         return jsonify({"error": str(e)}), 500
@@ -924,6 +971,15 @@ def list_jobs():
 def run_server(host: str = WEB_HOST, port: int = WEB_PORT, debug: bool = WEB_DEBUG):
     """Start the web server."""
     logger.info(f"Starting web server on {host}:{port} (debug={debug})")
+    
+    # Initialize database first
+    logger.info("Initializing database...")
+    setup_database()
+    
+    # Initialize playlist cache from Apple Music on startup
+    logger.info("Loading playlists from Apple Music...")
+    _init_playlists_from_apple_music()
+    
     app.run(host=host, port=port, debug=debug)
 
 
