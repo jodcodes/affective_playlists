@@ -100,6 +100,41 @@ class JobResult(Base):
         return f"<JobResult(job_id={self.job_id}, size={self.result_size_bytes})>"
 
 
+class Playlist(Base):
+    """Cached playlist metadata from Apple Music."""
+
+    __tablename__ = "playlists"
+
+    # Primary key - use persistent ID from Music.app
+    persistent_id = Column(String(128), primary_key=True, index=True)
+
+    # Playlist metadata
+    name = Column(String(512), index=True, nullable=False)
+    track_count = Column(Integer, default=0)
+    genre = Column(String(128), nullable=True)
+    created_date = Column(DateTime, nullable=True)
+
+    # Status tracking
+    classified = Column(String(50), nullable=True, default=None)  # genre classification result
+    enriched = Column(String(50), default="pending")  # pending, in_progress, completed, failed
+    last_synced = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_modified = Column(DateTime, nullable=True)
+
+    def __repr__(self):
+        return f"<Playlist(id={self.persistent_id}, name={self.name}, tracks={self.track_count})>"
+
+    def to_dict(self):
+        """Convert to frontend API format."""
+        return {
+            "id": self.persistent_id,
+            "name": self.name,
+            "track_count": self.track_count,
+            "genre": self.genre,
+            "classified": self.classified is not None,
+            "created_date": self.created_date.isoformat() if self.created_date else None,
+        }
+
+
 class JobEvent(Base):
     """Job event - audit log of all state changes."""
 

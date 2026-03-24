@@ -12,6 +12,7 @@ This interface just returns all playlists; the caller decides which to process.
 import os
 import re
 import subprocess
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from src.logger import setup_logger
@@ -31,7 +32,17 @@ class AppleMusicInterface:
 
         Note: Whitelist filtering is handled externally via shared.config module
         """
-        self.scripts_dir = scripts_dir
+        # Resolve scripts directory robustly across entrypoints/cwds.
+        requested = Path(scripts_dir)
+        candidates = [
+            requested,
+            Path.cwd() / requested,
+            Path.cwd() / "src" / "scripts",
+            Path(__file__).resolve().parent / "scripts",
+        ]
+
+        resolved = next((p for p in candidates if p.exists() and p.is_dir()), requested)
+        self.scripts_dir = str(resolved)
 
     def _run_applescript(self, script: str) -> Tuple[bool, str]:
         """
@@ -152,6 +163,49 @@ end tell
             return []
 
         return [name.strip() for name in output.split(",") if name.strip()]
+
+    def get_user_playlists_with_counts(self) -> List[Dict[str, int | str]]:
+        """
+        Get user playlists with track counts using a single AppleScript call.
+
+        Returns:
+            List of dictionaries: {"name": <playlist_name>, "track_count": <int>}
+        """
+        script = """
+tell application "Music"
+    set outLines to {}
+    try
+        repeat with pl in (every user playlist)
+            set plName to name of pl
+            set trackCount to 0
+            try
+                set trackCount to count of tracks of pl
+            end try
+            set end of outLines to plName & "|||" & (trackCount as text)
+        end repeat
+        return outLines
+    on error
+        return {}
+    end try
+end tell
+"""
+        success, output = self._run_applescript(script)
+        if not success or not output:
+            return []
+
+        results: List[Dict[str, int | str]] = []
+        for item in output.split(","):
+            entry = item.strip()
+            if "|||" not in entry:
+                continue
+            name, count_text = entry.split("|||", 1)
+            try:
+                track_count = int(count_text.strip())
+            except ValueError:
+                track_count = 0
+            results.append({"name": name.strip(), "track_count": track_count})
+
+        return results
 
     def is_folder(self, item_name: str) -> bool:
         """Check if an item is a folder (True) or playlist (False)."""
