@@ -14,6 +14,7 @@ Test coverage:
 
 import json
 import time
+import uuid
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, Mock, patch
 
@@ -62,7 +63,7 @@ class TestJobSubmission:
         job_ids = set()
         for _ in range(5):
             # Submit enrichment
-            job_id = f"enrichment-{time.time()}-uuid"
+            job_id = f"enrichment-{time.time()}-{uuid.uuid4().hex[:8]}"
             job_ids.add(job_id)
 
         assert len(job_ids) == 5, "All job IDs should be unique"
