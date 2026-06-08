@@ -67,10 +67,13 @@ class TestAppleMusicFolderStructure(unittest.TestCase):
 
         result = self.client.get_favourite_tracks()
 
-        self.assertIn("trackInfo's name to name of trk", captured["script"])
+        script = " ".join(captured["script"].split())
         self.assertIn(
-            "trackInfo's persistent_id to persistent ID of trk",
-            captured["script"],
+            "set trackInfo to {title:name of trk, name:name of trk, "
+            "persistent_id:persistent ID of trk, artist:artist of trk, "
+            "album:album of trk, genre:genre of trk, bpm:bpm of trk, "
+            "year:year of trk, composer:composer of trk, duration:duration of trk}",
+            script,
         )
         self.assertEqual(result[0]["title"], "Track A")
         self.assertEqual(result[0]["name"], "Track A")

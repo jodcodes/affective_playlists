@@ -285,17 +285,7 @@ tell application "Music"
         set trackCount to count of tracks of targetPlaylist
         if trackCount > 0 then
             repeat with trk in tracks of targetPlaylist
-                set trackInfo to {{}}
-                set trackInfo's title to name of trk
-                set trackInfo's name to name of trk
-                set trackInfo's persistent_id to persistent ID of trk
-                set trackInfo's artist to artist of trk
-                set trackInfo's album to album of trk
-                set trackInfo's genre to genre of trk
-                set trackInfo's bpm to bpm of trk
-                set trackInfo's year to year of trk
-                set trackInfo's composer to composer of trk
-                set trackInfo's duration to duration of trk
+                set trackInfo to {{title:name of trk, name:name of trk, persistent_id:persistent ID of trk, artist:artist of trk, album:album of trk, genre:genre of trk, bpm:bpm of trk, year:year of trk, composer:composer of trk, duration:duration of trk}}
                 set end of trackList to trackInfo
             end repeat
         end if
