@@ -246,6 +246,11 @@ end tell
         # If both failed
         return []
 
+    def get_favourite_tracks(self) -> List[Dict]:
+        """Return tracks from Apple Music's Favourite Songs playlist."""
+        tracks = self.get_playlist_tracks("Favourite Songs")
+        return tracks or []
+
     def _get_regular_playlist_tracks(self, playlist_name: str) -> Optional[List[Dict]]:
         """Get tracks from a regular (non-folder) playlist."""
         script = f"""
