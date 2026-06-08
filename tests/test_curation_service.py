@@ -105,6 +105,9 @@ def test_fav_preview_builds_assignments_and_changes():
     targets = [a["target_path"] for a in preview["assignments"]]
     assert ["Fav Songs", "Hip Hop", "Fav Hip Hop Frolic"] in targets
     assert ["Fav Songs", "Electronic", "Fav Electronic Dread"] in targets
+    assert set(preview["grouped"]["Hip Hop"]) == {"Woe", "Frolic", "Dread", "Malice"}
+    assert preview["grouped"]["Hip Hop"]["Frolic"][0]["item_id"] == "track-1"
+    assert preview["grouped"]["Electronic"]["Dread"][0]["item_id"] == "track-2"
     assert preview["changes"][0]["action"] == "ensure_folder"
 
 

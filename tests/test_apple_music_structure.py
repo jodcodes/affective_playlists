@@ -1,3 +1,4 @@
+from pathlib import Path
 import shutil
 import subprocess
 from types import SimpleNamespace
@@ -259,6 +260,16 @@ def test_applier_reports_missing_script_and_rejects_directories(tmp_path):
     assert result["error"].startswith("Script not found:")
     assert result["applied"] == 0
     assert result["failed"] == 0
+
+
+def test_jxa_copy_track_searches_favourite_songs_before_library():
+    script = Path("src/scripts/curation_structure.js").read_text(encoding="utf-8")
+
+    favourite_lookup = 'firstNamed(Music.playlists, "Favourite Songs")'
+    library_lookup = "Music.libraryPlaylists[0]"
+    assert favourite_lookup in script
+    assert library_lookup in script
+    assert script.index(favourite_lookup) < script.index(library_lookup)
 
 
 def test_curation_structure_no_arg_guard_returns_fast_error():

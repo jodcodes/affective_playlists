@@ -60,10 +60,10 @@ class AppleMusicInterface:
                 text=True,
             )
             try:
-                stdout, stderr = process.communicate(input=script, timeout=20)
+                stdout, stderr = process.communicate(input=script, timeout=120)
             except subprocess.TimeoutExpired:
                 process.kill()
-                return False, "AppleScript execution timed out after 20s"
+                return False, "AppleScript execution timed out after 120s"
 
             if process.returncode != 0:
                 return False, stderr
@@ -296,7 +296,9 @@ tell application "Music"
 end tell
 """
         success, output = self._run_applescript(script)
-        if not success or not output:
+        if not success:
+            raise RuntimeError(f"Failed to load playlist tracks: {output}")
+        if not output:
             return None
 
         tracks = self._parse_applescript_dict_list(output)

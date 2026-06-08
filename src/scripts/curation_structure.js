@@ -83,6 +83,14 @@ function ensureTargetPlaylist(rootName, genreName, playlistName) {
 }
 
 function sourceTrackByPersistentID(trackPID) {
+  const favouriteSongs = firstNamed(Music.playlists, "Favourite Songs");
+  if (favouriteSongs) {
+    const favouriteMatches = favouriteSongs.tracks.whose({ persistentID: trackPID });
+    if (favouriteMatches.length > 0) {
+      return favouriteMatches[0];
+    }
+  }
+
   const libraryPlaylist = Music.libraryPlaylists[0];
   if (!libraryPlaylist) {
     throw new Error("main library playlist not found");

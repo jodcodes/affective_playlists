@@ -89,14 +89,32 @@ class CurationService:
         assignments = self.store.apply_overrides(assignments)
         changes = self.planner.plan_fav_tracks(assignments)
 
+        assignment_dicts = [assignment.to_dict() for assignment in assignments]
+        grouped = self._group_assignments(assignment_dicts)
+
         return {
-            "assignments": [assignment.to_dict() for assignment in assignments],
+            "assignments": assignment_dicts,
+            "grouped": grouped,
             "changes": [change.to_dict() for change in changes],
             "total_assignments": len(assignments),
             "total_changes": len(changes),
             "skipped_tracks": skipped_tracks,
             "total_skipped": len(skipped_tracks),
         }
+
+    def _group_assignments(
+        self, assignments: List[Dict[str, Any]]
+    ) -> Dict[str, Dict[str, List[Dict[str, Any]]]]:
+        grouped: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
+        for assignment in assignments:
+            genre = str(assignment.get("genre_label") or "Other")
+            temperament = str(assignment.get("temperament") or TemperBucket.FROLIC.value)
+            grouped.setdefault(
+                genre,
+                {temper.value: [] for temper in TemperBucket},
+            )
+            grouped[genre].setdefault(temperament, []).append(assignment)
+        return grouped
 
     def apply_fav_songs(self, confirmed: bool) -> Dict[str, Any]:
         preview = self.preview_fav_songs()

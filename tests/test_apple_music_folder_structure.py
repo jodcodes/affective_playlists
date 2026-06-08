@@ -79,6 +79,13 @@ class TestAppleMusicFolderStructure(unittest.TestCase):
         self.assertEqual(result[0]["name"], "Track A")
         self.assertEqual(result[0]["persistent_id"], "ABC123")
 
+    @patch.object(AppleMusicInterface, "_run_applescript")
+    def test_get_regular_playlist_tracks_raises_on_applescript_failure(self, mock_run):
+        mock_run.return_value = (False, "AppleScript execution timed out after 120s")
+
+        with self.assertRaisesRegex(RuntimeError, "timed out"):
+            self.client._get_regular_playlist_tracks("Favourite Songs")
+
 
 if __name__ == "__main__":
     unittest.main()
