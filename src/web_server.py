@@ -181,6 +181,17 @@ def _get_playlist_classifier():
         return None
 
 
+def _get_curation_service():
+    """Initialize and return curation service."""
+    try:
+        from src.curation_service import CurationService
+
+        return CurationService()
+    except Exception as e:
+        logger.warning(f"Failed to initialize CurationService: {e}")
+        return None
+
+
 @app.route("/")
 def index():
     """Serve the main frontend HTML."""
@@ -502,6 +513,48 @@ def move_playlists():
         )
     except Exception as e:
         logger.error(f"Failed to move playlists: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/curation/preview", methods=["GET"])
+def curation_preview():
+    """Preview playlist curation assignments and changes."""
+    try:
+        scope = request.args.get("scope", "fav_songs")
+        if scope != "fav_songs":
+            return jsonify({"error": "Unsupported curation scope"}), 400
+
+        service = _get_curation_service()
+        if not service:
+            return jsonify({"error": "Curation service unavailable"}), 503
+
+        return jsonify(service.preview_fav_songs())
+    except Exception as e:
+        logger.error(f"Failed to preview curation: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/curation/apply", methods=["POST"])
+def curation_apply():
+    """Apply playlist curation changes after confirmation."""
+    try:
+        data = request.get_json(silent=True) or {}
+        scope = data.get("scope", "fav_songs")
+        if scope != "fav_songs":
+            return jsonify({"error": "Unsupported curation scope"}), 400
+
+        confirmed = bool(data.get("confirmed", False))
+        service = _get_curation_service()
+        if not service:
+            return jsonify({"error": "Curation service unavailable"}), 503
+
+        result = service.apply_fav_songs(confirmed=confirmed)
+        if not result.get("success") and result.get("error") == "Confirmation required":
+            return jsonify(result), 400
+
+        return jsonify(result), 200 if result.get("success") else 500
+    except Exception as e:
+        logger.error(f"Failed to apply curation: {e}")
         return jsonify({"error": str(e)}), 500
 
 

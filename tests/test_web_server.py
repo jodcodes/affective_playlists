@@ -29,12 +29,14 @@ from src.web_server import app
 
 
 @pytest.fixture
-def client():
+def client(monkeypatch):
     """Create Flask test client."""
     app.config["TESTING"] = True
 
     # Reset global state before each test
     import src.web_server as ws
+
+    monkeypatch.setattr(ws, "_get_playlist_manager", lambda: None)
 
     ws._enrichment_state = {
         "running": False,
@@ -469,6 +471,73 @@ class TestMoveEndpoint:
         response = client.post("/api/playlists/move", json={"confirmed": True})
         data = json.loads(response.data)
         assert "results" in data
+
+
+class TestCurationEndpoints:
+    """Tests for playlist curation API endpoints."""
+
+    def test_curation_preview_returns_assignments_and_changes(self, client, monkeypatch):
+        class FakeService:
+            def preview_fav_songs(self):
+                return {
+                    "assignments": [],
+                    "changes": [],
+                    "total_assignments": 0,
+                    "total_changes": 0,
+                }
+
+        monkeypatch.setattr("src.web_server._get_curation_service", lambda: FakeService())
+
+        response = client.get("/api/curation/preview?scope=fav_songs")
+
+        assert response.status_code == 200
+        assert response.get_json()["total_assignments"] == 0
+
+    def test_curation_apply_requires_confirmation(self, client, monkeypatch):
+        class FakeService:
+            def apply_fav_songs(self, confirmed):
+                return {
+                    "success": False,
+                    "error": "Confirmation required",
+                    "applied": 0,
+                    "failed": 0,
+                }
+
+        monkeypatch.setattr("src.web_server._get_curation_service", lambda: FakeService())
+
+        response = client.post(
+            "/api/curation/apply",
+            json={"scope": "fav_songs", "confirmed": False},
+        )
+
+        assert response.status_code == 400
+        assert response.get_json()["error"] == "Confirmation required"
+
+    def test_curation_preview_rejects_unsupported_scope(self, client, monkeypatch):
+        monkeypatch.setattr("src.web_server._get_curation_service", lambda: None)
+
+        response = client.get("/api/curation/preview?scope=library")
+
+        assert response.status_code == 400
+        assert response.get_json()["error"] == "Unsupported curation scope"
+
+    def test_curation_apply_rejects_unsupported_scope(self, client, monkeypatch):
+        monkeypatch.setattr("src.web_server._get_curation_service", lambda: None)
+
+        response = client.post("/api/curation/apply", json={"scope": "library"})
+
+        assert response.status_code == 400
+        assert response.get_json()["error"] == "Unsupported curation scope"
+
+    def test_curation_preview_returns_503_when_service_unavailable(
+        self, client, monkeypatch
+    ):
+        monkeypatch.setattr("src.web_server._get_curation_service", lambda: None)
+
+        response = client.get("/api/curation/preview?scope=fav_songs")
+
+        assert response.status_code == 503
+        assert response.get_json()["error"] == "Curation service unavailable"
 
 
 if __name__ == "__main__":
