@@ -249,7 +249,30 @@ end tell
     def get_favourite_tracks(self) -> List[Dict]:
         """Return tracks from Apple Music's Favourite Songs playlist."""
         tracks = self.get_playlist_tracks("Favourite Songs")
-        return tracks or []
+        return [self._normalize_track_dict(track) for track in tracks] if tracks else []
+
+    def _normalize_track_dict(self, track: Dict) -> Dict:
+        """Normalize Apple Music track identity fields while preserving raw keys."""
+        normalized = dict(track)
+
+        name = normalized.get("name")
+        title = normalized.get("title")
+        if (name is None or str(name).strip() == "") and title is not None:
+            normalized["name"] = title
+        if (title is None or str(title).strip() == "") and name is not None:
+            normalized["title"] = name
+
+        persistent_id = (
+            normalized.get("persistent_id")
+            or normalized.get("persistent ID")
+            or normalized.get("persistent id")
+            or normalized.get("persistentId")
+            or normalized.get("persistentID")
+        )
+        if persistent_id is not None and str(persistent_id).strip():
+            normalized["persistent_id"] = str(persistent_id).strip()
+
+        return normalized
 
     def _get_regular_playlist_tracks(self, playlist_name: str) -> Optional[List[Dict]]:
         """Get tracks from a regular (non-folder) playlist."""
@@ -264,6 +287,8 @@ tell application "Music"
             repeat with trk in tracks of targetPlaylist
                 set trackInfo to {{}}
                 set trackInfo's title to name of trk
+                set trackInfo's name to name of trk
+                set trackInfo's persistent_id to persistent ID of trk
                 set trackInfo's artist to artist of trk
                 set trackInfo's album to album of trk
                 set trackInfo's genre to genre of trk
@@ -444,7 +469,7 @@ end tell
                     track_dict[key] = value
 
             if track_dict:
-                tracks.append(track_dict)
+                tracks.append(self._normalize_track_dict(track_dict))
 
         return tracks if tracks else None
 

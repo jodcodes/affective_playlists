@@ -19,7 +19,8 @@ from src.curation_store import CurationStore
 class KeywordTemperClassifier:
     def classify_track(self, track: Dict[str, Any]) -> TemperBucket:
         text = " ".join(
-            str(track.get(field) or "") for field in ("name", "artist", "genre")
+            str(track.get(field) or "")
+            for field in ("name", "title", "artist", "genre")
         ).lower()
 
         if any(
@@ -56,14 +57,28 @@ class CurationService:
     def preview_fav_songs(self) -> Dict[str, Any]:
         tracks = self.apple_music.get_favourite_tracks()
         assignments: List[CurationAssignment] = []
+        skipped_tracks: List[Dict[str, str]] = []
 
         for track in tracks:
+            item_id = str(track.get("persistent_id") or track.get("id") or "").strip()
+            item_name = str(track.get("name") or track.get("title") or "Unknown Track")
+            if not item_id:
+                skipped_tracks.append(
+                    {
+                        "name": item_name,
+                        "artist": str(track.get("artist") or ""),
+                        "genre": str(track.get("genre") or ""),
+                        "reason": "missing_stable_id",
+                    }
+                )
+                continue
+
             raw_genre = str(track.get("genre") or "other").strip() or "other"
             assignments.append(
                 CurationAssignment(
                     item_type=AssignmentType.FAV_TRACK,
-                    item_id=str(track.get("persistent_id") or track.get("id") or ""),
-                    item_name=str(track.get("name") or "Unknown Track"),
+                    item_id=item_id,
+                    item_name=item_name,
                     genre=raw_genre.lower().replace(" ", "_"),
                     temperament=self.temper_classifier.classify_track(track),
                     source=AssignmentSource.AUTO,
@@ -79,6 +94,8 @@ class CurationService:
             "changes": [change.to_dict() for change in changes],
             "total_assignments": len(assignments),
             "total_changes": len(changes),
+            "skipped_tracks": skipped_tracks,
+            "total_skipped": len(skipped_tracks),
         }
 
     def apply_fav_songs(self, confirmed: bool) -> Dict[str, Any]:

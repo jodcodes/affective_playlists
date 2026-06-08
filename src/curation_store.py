@@ -49,7 +49,12 @@ class CurationStore:
     def apply_overrides(
         self, assignments: list[CurationAssignment]
     ) -> list[CurationAssignment]:
-        return [
-            self.get_override(assignment.item_type, assignment.item_id) or assignment
-            for assignment in assignments
-        ]
+        data = self._load()
+        merged: list[CurationAssignment] = []
+        for assignment in assignments:
+            payload = data.get(self._key(assignment.item_type, assignment.item_id))
+            if payload is None:
+                merged.append(assignment)
+                continue
+            merged.append(CurationAssignment.from_dict(payload))
+        return merged

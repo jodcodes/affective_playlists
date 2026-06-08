@@ -52,6 +52,30 @@ class TestAppleMusicFolderStructure(unittest.TestCase):
 
         self.assertIsNone(result)
 
+    @patch.object(AppleMusicInterface, "_run_applescript")
+    def test_get_favourite_tracks_normalizes_track_identity(self, mock_run):
+        captured = {}
+
+        def fake_run(script):
+            captured["script"] = script
+            return (
+                True,
+                "{title:Track A, artist:Artist A, genre:Hip-Hop, persistent_id:ABC123}",
+            )
+
+        mock_run.side_effect = fake_run
+
+        result = self.client.get_favourite_tracks()
+
+        self.assertIn("trackInfo's name to name of trk", captured["script"])
+        self.assertIn(
+            "trackInfo's persistent_id to persistent ID of trk",
+            captured["script"],
+        )
+        self.assertEqual(result[0]["title"], "Track A")
+        self.assertEqual(result[0]["name"], "Track A")
+        self.assertEqual(result[0]["persistent_id"], "ABC123")
+
 
 if __name__ == "__main__":
     unittest.main()
