@@ -543,7 +543,10 @@ def curation_apply():
         if scope != "fav_songs":
             return jsonify({"error": "Unsupported curation scope"}), 400
 
-        confirmed = bool(data.get("confirmed", False))
+        confirmed = data.get("confirmed", False)
+        if not isinstance(confirmed, bool):
+            return jsonify({"error": "confirmed must be a boolean"}), 400
+
         service = _get_curation_service()
         if not service:
             return jsonify({"error": "Curation service unavailable"}), 503

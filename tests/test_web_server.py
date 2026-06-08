@@ -36,7 +36,26 @@ def client(monkeypatch):
     # Reset global state before each test
     import src.web_server as ws
 
-    monkeypatch.setattr(ws, "_get_playlist_manager", lambda: None)
+    class FakePlaylistManager:
+        def get_all_playlists(self):
+            return [
+                {
+                    "id": "test-playlist-1",
+                    "name": "Test Playlist",
+                    "track_count": 0,
+                }
+            ]
+
+        def get_playlist_details(self, playlist_id):
+            return {
+                "id": playlist_id,
+                "name": f"Playlist {playlist_id}",
+                "track_count": 0,
+                "genre": None,
+                "tracks": [],
+            }
+
+    monkeypatch.setattr(ws, "_get_playlist_manager", lambda: FakePlaylistManager())
 
     ws._enrichment_state = {
         "running": False,
@@ -476,6 +495,23 @@ class TestMoveEndpoint:
 class TestCurationEndpoints:
     """Tests for playlist curation API endpoints."""
 
+    class RecordingService:
+        def __init__(self, success_on_confirm=True, error_on_failure="Confirmation required"):
+            self.confirmed_values = []
+            self.success_on_confirm = success_on_confirm
+            self.error_on_failure = error_on_failure
+
+        def apply_fav_songs(self, confirmed):
+            self.confirmed_values.append(confirmed)
+            if confirmed and self.success_on_confirm:
+                return {"success": True, "applied": 1, "failed": 0}
+            return {
+                "success": False,
+                "error": self.error_on_failure,
+                "applied": 0,
+                "failed": 0,
+            }
+
     def test_curation_preview_returns_assignments_and_changes(self, client, monkeypatch):
         class FakeService:
             def preview_fav_songs(self):
@@ -493,17 +529,21 @@ class TestCurationEndpoints:
         assert response.status_code == 200
         assert response.get_json()["total_assignments"] == 0
 
-    def test_curation_apply_requires_confirmation(self, client, monkeypatch):
-        class FakeService:
-            def apply_fav_songs(self, confirmed):
-                return {
-                    "success": False,
-                    "error": "Confirmation required",
-                    "applied": 0,
-                    "failed": 0,
-                }
+    def test_curation_apply_missing_confirmation_passes_false(
+        self, client, monkeypatch
+    ):
+        service = self.RecordingService()
+        monkeypatch.setattr("src.web_server._get_curation_service", lambda: service)
 
-        monkeypatch.setattr("src.web_server._get_curation_service", lambda: FakeService())
+        response = client.post("/api/curation/apply", json={"scope": "fav_songs"})
+
+        assert response.status_code == 400
+        assert response.get_json()["error"] == "Confirmation required"
+        assert service.confirmed_values == [False]
+
+    def test_curation_apply_false_confirmation_passes_false(self, client, monkeypatch):
+        service = self.RecordingService()
+        monkeypatch.setattr("src.web_server._get_curation_service", lambda: service)
 
         response = client.post(
             "/api/curation/apply",
@@ -512,6 +552,63 @@ class TestCurationEndpoints:
 
         assert response.status_code == 400
         assert response.get_json()["error"] == "Confirmation required"
+        assert service.confirmed_values == [False]
+
+    def test_curation_apply_true_confirmation_passes_true(self, client, monkeypatch):
+        service = self.RecordingService()
+        monkeypatch.setattr("src.web_server._get_curation_service", lambda: service)
+
+        response = client.post(
+            "/api/curation/apply",
+            json={"scope": "fav_songs", "confirmed": True},
+        )
+
+        assert response.status_code == 200
+        assert response.get_json()["success"] is True
+        assert service.confirmed_values == [True]
+
+    def test_curation_apply_rejects_string_confirmation_without_calling_service(
+        self, client, monkeypatch
+    ):
+        service = self.RecordingService()
+        monkeypatch.setattr("src.web_server._get_curation_service", lambda: service)
+
+        response = client.post(
+            "/api/curation/apply",
+            json={"scope": "fav_songs", "confirmed": "false"},
+        )
+
+        assert response.status_code == 400
+        assert response.get_json()["error"] == "confirmed must be a boolean"
+        assert service.confirmed_values == []
+
+    def test_curation_apply_returns_503_when_service_unavailable(
+        self, client, monkeypatch
+    ):
+        monkeypatch.setattr("src.web_server._get_curation_service", lambda: None)
+
+        response = client.post(
+            "/api/curation/apply",
+            json={"scope": "fav_songs", "confirmed": True},
+        )
+
+        assert response.status_code == 503
+        assert response.get_json()["error"] == "Curation service unavailable"
+
+    def test_curation_apply_returns_500_for_non_confirmation_failure(
+        self, client, monkeypatch
+    ):
+        service = self.RecordingService(error_on_failure="Apply failed")
+        monkeypatch.setattr("src.web_server._get_curation_service", lambda: service)
+
+        response = client.post(
+            "/api/curation/apply",
+            json={"scope": "fav_songs", "confirmed": False},
+        )
+
+        assert response.status_code == 500
+        assert response.get_json()["error"] == "Apply failed"
+        assert service.confirmed_values == [False]
 
     def test_curation_preview_rejects_unsupported_scope(self, client, monkeypatch):
         monkeypatch.setattr("src.web_server._get_curation_service", lambda: None)
