@@ -13,6 +13,7 @@ Usage:
     python main.py temperament        # Run temperament analysis
     python main.py enrich             # Run metadata enrichment
     python main.py organize           # Run playlist organization
+    python main.py curate             # Preview Favourite Songs curation
 """
 
 import sys
@@ -247,6 +248,29 @@ def run_playlist_organization(args=None):
         return 1
 
 
+def run_curation(args=None):
+    """Run curation preview/apply for Favourite Songs."""
+    print_header("Curation", "Review and apply Favourite Songs structure")
+
+    if not require_macos("Curation"):
+        return 1
+
+    from src.curation_service import CurationService
+
+    service = CurationService()
+    if args and getattr(args, "apply", False):
+        result = service.apply_fav_songs(confirmed=True)
+        print(info(f"Applied: {result.get('applied', 0)} | Failed: {result.get('failed', 0)}"))
+        return 0 if result.get("success") else 1
+
+    preview = service.preview_fav_songs()
+    print(info(f"Favourite tracks: {preview['total_assignments']}"))
+    print(info(f"Planned changes: {preview['total_changes']}"))
+    if preview.get("total_skipped"):
+        print(warning(f"Skipped tracks: {preview['total_skipped']}"))
+    return 0
+
+
 def show_interactive_menu():
     """Show interactive menu to select and run a feature."""
     print_header("🎵 affective_playlists", "Unified Music Library Organization")
@@ -274,7 +298,7 @@ def show_interactive_menu():
                 return 0
 
 
-def main():
+def main(argv=None):
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
         prog="affective_playlists",
@@ -286,15 +310,28 @@ def main():
     parser.add_argument(
         "feature",
         nargs="?",
-        choices=["temperament", "enrich", "organize"],
+        choices=["temperament", "enrich", "organize", "curate"],
         help="Feature to run (if not specified, shows interactive menu)",
+    )
+
+    parser.add_argument(
+        "--scope",
+        choices=["fav_songs"],
+        default="fav_songs",
+        help="Curation scope for the curate feature",
+    )
+
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="Apply Favourite Songs curation changes",
     )
 
     parser.add_argument("--version", action="version", version="%(prog)s 1.0.0")
 
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging")
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     if args.verbose:
         logger.setLevel("DEBUG")
@@ -306,6 +343,8 @@ def main():
         return run_metadata_enrichment()
     elif args.feature == "organize":
         return run_playlist_organization()
+    elif args.feature == "curate":
+        return run_curation(args)
     else:
         # Show interactive menu if no feature specified
         return show_interactive_menu()

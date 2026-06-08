@@ -8,6 +8,7 @@ invoked on non-macOS platforms.
 import os
 import subprocess
 import sys
+from types import SimpleNamespace
 from io import StringIO
 from unittest.mock import MagicMock, patch
 
@@ -121,3 +122,57 @@ class TestAPIKeyValidation:
                             # It should get past API key validation and fail on Music.app auth
                             assert result == 1  # Failed due to Music.app, not API key
                             mock_llm.assert_called_once()  # LLM client was created
+
+
+def test_curate_feature_accepts_dry_run(monkeypatch):
+    import main
+
+    calls = {}
+
+    def fake_run_curation(args):
+        calls["scope"] = args.scope
+        calls["apply"] = args.apply
+        return 0
+
+    monkeypatch.setattr(main, "run_curation", fake_run_curation, raising=False)
+    monkeypatch.setattr(main, "IS_MACOS", True)
+
+    assert main.main(["curate", "--scope", "fav_songs"]) == 0
+    assert calls == {"scope": "fav_songs", "apply": False}
+
+
+def test_curate_feature_accepts_apply(monkeypatch):
+    import main
+
+    calls = {}
+
+    def fake_run_curation(args):
+        calls["scope"] = args.scope
+        calls["apply"] = args.apply
+        return 0
+
+    monkeypatch.setattr(main, "run_curation", fake_run_curation, raising=False)
+    monkeypatch.setattr(main, "IS_MACOS", True)
+
+    assert main.main(["curate", "--scope", "fav_songs", "--apply"]) == 0
+    assert calls == {"scope": "fav_songs", "apply": True}
+
+
+def test_curate_feature_on_non_macos_exits_without_service(monkeypatch):
+    import main
+
+    calls = {"constructed": False}
+
+    class FakeCurationService:
+        def __init__(self):
+            calls["constructed"] = True
+
+    monkeypatch.setattr(main, "IS_MACOS", False)
+    monkeypatch.setitem(
+        sys.modules,
+        "src.curation_service",
+        SimpleNamespace(CurationService=FakeCurationService),
+    )
+
+    assert main.main(["curate"]) == 1
+    assert calls == {"constructed": False}
