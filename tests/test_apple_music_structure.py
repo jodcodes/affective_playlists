@@ -1,4 +1,11 @@
-from src.apple_music_structure import AppleMusicChange, AppleMusicStructurePlanner
+from types import SimpleNamespace
+from unittest.mock import patch
+
+from src.apple_music_structure import (
+    AppleMusicChange,
+    AppleMusicStructureApplier,
+    AppleMusicStructurePlanner,
+)
 from src.curation_models import (
     AssignmentSource,
     AssignmentType,
@@ -113,3 +120,86 @@ def test_plan_deduplicates_structural_changes_but_keeps_distinct_track_copies():
     assert len(ensure_genre_folder) == 1
     assert len(ensure_playlist) == 1
     assert len(copy_track) == 2
+
+
+def test_applier_rejects_without_confirmation(tmp_path):
+    script_path = tmp_path / "curation_structure.js"
+    script_path.write_text("// test script", encoding="utf-8")
+    applier = AppleMusicStructureApplier(script_path=str(script_path))
+    change = AppleMusicChange("ensure_folder", ["Fav Songs"], "Ensure folder Fav Songs")
+
+    with patch("src.apple_music_structure.subprocess.run") as run:
+        result = applier.apply_changes([change], confirmed=False)
+
+    run.assert_not_called()
+    assert result["success"] is False
+    assert result["error"] == "Confirmation required"
+    assert result["applied"] == 0
+    assert result["failed"] == 0
+
+
+def test_applier_runs_confirmed_changes_with_jxa(tmp_path):
+    script_path = tmp_path / "curation_structure.js"
+    script_path.write_text("// test script", encoding="utf-8")
+    applier = AppleMusicStructureApplier(script_path=str(script_path))
+    change = AppleMusicChange("ensure_folder", ["Fav Songs"], "Ensure folder Fav Songs")
+
+    with patch("src.apple_music_structure.subprocess.run") as run:
+        run.return_value = SimpleNamespace(returncode=0, stdout="SUCCESS", stderr="")
+        result = applier.apply_changes([change], confirmed=True)
+
+    run.assert_called_once_with(
+        [
+            "osascript",
+            "-l",
+            "JavaScript",
+            str(script_path),
+            "ensure_folder",
+            "Fav Songs",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert result["success"] is True
+    assert result["applied"] == 1
+    assert result["failed"] == 0
+
+
+def test_applier_records_subprocess_failures(tmp_path):
+    script_path = tmp_path / "curation_structure.js"
+    script_path.write_text("// test script", encoding="utf-8")
+    applier = AppleMusicStructureApplier(script_path=str(script_path))
+    change = AppleMusicChange("ensure_folder", ["Fav Songs"], "Ensure folder Fav Songs")
+
+    with patch("src.apple_music_structure.subprocess.run") as run:
+        run.return_value = SimpleNamespace(
+            returncode=1,
+            stdout="partial output\n",
+            stderr="failed to create folder\n",
+        )
+        result = applier.apply_changes([change], confirmed=True)
+
+    assert result["success"] is False
+    assert result["applied"] == 0
+    assert result["failed"] == 1
+    assert result["errors"] == [
+        {
+            "change": change.to_dict(),
+            "stdout": "partial output",
+            "stderr": "failed to create folder",
+        }
+    ]
+
+
+def test_applier_reports_missing_script(tmp_path):
+    script_path = tmp_path / "missing_curation_structure.js"
+    applier = AppleMusicStructureApplier(script_path=str(script_path))
+    change = AppleMusicChange("ensure_folder", ["Fav Songs"], "Ensure folder Fav Songs")
+
+    result = applier.apply_changes([change], confirmed=True)
+
+    assert result["success"] is False
+    assert result["error"].startswith("Script not found:")
+    assert result["applied"] == 0
+    assert result["failed"] == 0

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import os
+import subprocess
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from .curation_models import AssignmentType, CurationAssignment
@@ -61,3 +64,70 @@ class AppleMusicStructurePlanner:
             )
 
         return changes
+
+
+class AppleMusicStructureApplier:
+    def __init__(self, script_path: str | None = None) -> None:
+        if script_path is None:
+            script_path = str(Path(__file__).parent / "scripts" / "curation_structure.js")
+        self.script_path = str(script_path)
+
+    def apply_changes(
+        self, changes: Iterable[AppleMusicChange], confirmed: bool
+    ) -> dict[str, Any]:
+        if not confirmed:
+            return {
+                "success": False,
+                "error": "Confirmation required",
+                "applied": 0,
+                "failed": 0,
+            }
+
+        if not os.path.exists(self.script_path):
+            return {
+                "success": False,
+                "error": f"Script not found: {self.script_path}",
+                "applied": 0,
+                "failed": 0,
+            }
+
+        applied = 0
+        failed = 0
+        errors: list[dict[str, Any]] = []
+
+        for change in changes:
+            result = subprocess.run(
+                [
+                    "osascript",
+                    "-l",
+                    "JavaScript",
+                    self.script_path,
+                    change.action,
+                    *change.path,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+            stdout = result.stdout.strip()
+            stderr = result.stderr.strip()
+
+            if result.returncode == 0 and "SUCCESS" in result.stdout:
+                applied += 1
+                continue
+
+            failed += 1
+            errors.append(
+                {
+                    "change": change.to_dict(),
+                    "stdout": stdout,
+                    "stderr": stderr,
+                }
+            )
+
+        return {
+            "success": failed == 0,
+            "applied": applied,
+            "failed": failed,
+            "errors": errors,
+        }
