@@ -49,13 +49,15 @@ const app = {
         } catch (error) {
             console.error('API Error:', error);
             app.state.isOnline = false;
-            app.updateStatus();
+            updateStatus();
             throw error;
         }
     },
 };
 
 let curationPreview = null;
+let curationPreviewLoading = false;
+let curationApplyInFlight = false;
 
 // ============================================================================
 // DOM Elements
@@ -157,6 +159,9 @@ function showView(viewName) {
     const view = document.getElementById(viewIds[viewName] || viewName);
     if (view) {
         view.classList.add('active');
+        DOM.navLinks().forEach(link => {
+            link.classList.toggle('active', link.dataset.view === viewName);
+        });
         app.state.currentView = viewName;
         localStorage.setItem('affective_view', viewName);
 
@@ -551,23 +556,34 @@ async function confirmMove() {
 
 const CURATION_TEMPERS = ['Frolic', 'Woe', 'Dread', 'Malice'];
 
-async function parseCurationResponse(response) {
-    try {
-        return await response.json();
-    } catch (error) {
-        return {};
+function setCurationButtonsState() {
+    const isBusy = curationPreviewLoading || curationApplyInFlight;
+    const refreshBtn = DOM.curationRefreshBtn();
+    const dryRunBtn = DOM.curationDryRunBtn();
+    const applyBtn = DOM.curationApplyBtn();
+
+    if (refreshBtn) {
+        refreshBtn.disabled = isBusy;
+    }
+    if (dryRunBtn) {
+        dryRunBtn.disabled = isBusy;
+    }
+    if (applyBtn) {
+        applyBtn.disabled = isBusy || !curationPreview;
     }
 }
 
 async function loadCurationPreview() {
+    if (curationPreviewLoading || curationApplyInFlight) {
+        return;
+    }
+
+    curationPreviewLoading = true;
+    setCurationButtonsState();
+
     try {
         showSpinner(true);
-        const response = await fetch('/api/curation/preview?scope=fav_songs');
-        const preview = await parseCurationResponse(response);
-
-        if (!response.ok) {
-            throw new Error(preview.error || `HTTP ${response.status}: ${response.statusText}`);
-        }
+        const preview = await app.api('/curation/preview?scope=fav_songs');
 
         curationPreview = preview;
         renderCurationPreview(preview);
@@ -578,6 +594,8 @@ async function loadCurationPreview() {
         renderCurationError('Unable to load curation preview.');
         showAlert('Failed to load curation preview: ' + error.message, 'danger');
     } finally {
+        curationPreviewLoading = false;
+        setCurationButtonsState();
         showSpinner(false);
     }
 }
@@ -812,6 +830,16 @@ function renderCurationError(message) {
 }
 
 async function applyFavSongsCuration() {
+    if (curationApplyInFlight || curationPreviewLoading) {
+        return;
+    }
+
+    if (!curationPreview) {
+        setCurationButtonsState();
+        showAlert('Load a successful curation preview before applying changes.', 'warning');
+        return;
+    }
+
     const confirmed = window.confirm(
         'Apply Favourite Songs curation in Apple Music? This can create folders, playlists, and copy tracks.'
     );
@@ -820,28 +848,27 @@ async function applyFavSongsCuration() {
         return;
     }
 
+    curationApplyInFlight = true;
+    setCurationButtonsState();
+
     try {
         showSpinner(true);
-        const response = await fetch('/api/curation/apply', {
+        const result = await app.api('/curation/apply', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ scope: 'fav_songs', confirmed: true }),
+            body: { scope: 'fav_songs', confirmed: true },
         });
-        const result = await parseCurationResponse(response);
-
-        if (!response.ok || result.success === false) {
-            throw new Error(result.error || `HTTP ${response.status}: ${response.statusText}`);
-        }
 
         const applied = asNumber(result.applied);
         const failed = asNumber(result.failed);
         showAlert(`Applied ${applied} curation change${applied === 1 ? '' : 's'}${failed ? `, ${failed} failed` : ''}.`, 'success');
+        curationApplyInFlight = false;
+        setCurationButtonsState();
         await loadCurationPreview();
     } catch (error) {
         showAlert('Failed to apply curation: ' + error.message, 'danger');
     } finally {
+        curationApplyInFlight = false;
+        setCurationButtonsState();
         showSpinner(false);
     }
 }
@@ -856,8 +883,6 @@ function setupEventListeners() {
         link.addEventListener('click', (e) => {
             e.preventDefault();
             const view = link.dataset.view;
-            DOM.navLinks().forEach(l => l.classList.remove('active'));
-            link.classList.add('active');
             showView(view);
 
             // Load view-specific data
@@ -908,6 +933,7 @@ function setupEventListeners() {
     if (DOM.curationApplyBtn()) {
         DOM.curationApplyBtn().addEventListener('click', applyFavSongsCuration);
     }
+    setCurationButtonsState();
 }
 
 // ============================================================================
