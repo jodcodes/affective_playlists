@@ -1,5 +1,9 @@
+import shutil
+import subprocess
 from types import SimpleNamespace
 from unittest.mock import patch
+
+import pytest
 
 from src.apple_music_structure import (
     AppleMusicChange,
@@ -192,14 +196,86 @@ def test_applier_records_subprocess_failures(tmp_path):
     ]
 
 
-def test_applier_reports_missing_script(tmp_path):
-    script_path = tmp_path / "missing_curation_structure.js"
+def test_applier_records_timeout_failures(tmp_path):
+    script_path = tmp_path / "curation_structure.js"
+    script_path.write_text("// test script", encoding="utf-8")
     applier = AppleMusicStructureApplier(script_path=str(script_path))
     change = AppleMusicChange("ensure_folder", ["Fav Songs"], "Ensure folder Fav Songs")
 
-    result = applier.apply_changes([change], confirmed=True)
+    with patch("src.apple_music_structure.subprocess.run") as run:
+        run.side_effect = subprocess.TimeoutExpired(
+            cmd=["osascript"],
+            timeout=120,
+            output="partial output\n",
+            stderr="timed out\n",
+        )
+        result = applier.apply_changes([change], confirmed=True)
 
+    assert result["success"] is False
+    assert result["applied"] == 0
+    assert result["failed"] == 1
+    assert result["errors"] == [
+        {
+            "change": change.to_dict(),
+            "stdout": "partial output",
+            "stderr": "timed out",
+        }
+    ]
+
+
+def test_applier_records_os_errors(tmp_path):
+    script_path = tmp_path / "curation_structure.js"
+    script_path.write_text("// test script", encoding="utf-8")
+    applier = AppleMusicStructureApplier(script_path=str(script_path))
+    change = AppleMusicChange("ensure_folder", ["Fav Songs"], "Ensure folder Fav Songs")
+
+    with patch("src.apple_music_structure.subprocess.run") as run:
+        run.side_effect = OSError("osascript unavailable")
+        result = applier.apply_changes([change], confirmed=True)
+
+    assert result["success"] is False
+    assert result["applied"] == 0
+    assert result["failed"] == 1
+    assert result["errors"] == [
+        {
+            "change": change.to_dict(),
+            "stdout": "",
+            "stderr": "osascript unavailable",
+        }
+    ]
+
+
+def test_applier_reports_missing_script_and_rejects_directories(tmp_path):
+    script_path = tmp_path / "script_directory"
+    script_path.mkdir()
+    applier = AppleMusicStructureApplier(script_path=str(script_path))
+    change = AppleMusicChange("ensure_folder", ["Fav Songs"], "Ensure folder Fav Songs")
+
+    with patch("src.apple_music_structure.subprocess.run") as run:
+        result = applier.apply_changes([change], confirmed=True)
+
+    run.assert_not_called()
     assert result["success"] is False
     assert result["error"].startswith("Script not found:")
     assert result["applied"] == 0
     assert result["failed"] == 0
+
+
+def test_curation_structure_no_arg_guard_returns_fast_error():
+    if shutil.which("osascript") is None:
+        pytest.skip("osascript is not available")
+
+    result = subprocess.run(
+        [
+            "osascript",
+            "-l",
+            "JavaScript",
+            "src/scripts/curation_structure.js",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert result.returncode == 0
+    assert result.stdout.strip() == "ERROR: action and path required"

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import subprocess
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
@@ -8,6 +7,14 @@ from pathlib import Path
 from typing import Any
 
 from .curation_models import AssignmentType, CurationAssignment
+
+
+def _strip_process_output(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode(errors="replace").strip()
+    return str(value).strip()
 
 
 @dataclass(frozen=True)
@@ -83,7 +90,7 @@ class AppleMusicStructureApplier:
                 "failed": 0,
             }
 
-        if not os.path.exists(self.script_path):
+        if not Path(self.script_path).is_file():
             return {
                 "success": False,
                 "error": f"Script not found: {self.script_path}",
@@ -96,23 +103,45 @@ class AppleMusicStructureApplier:
         errors: list[dict[str, Any]] = []
 
         for change in changes:
-            result = subprocess.run(
-                [
-                    "osascript",
-                    "-l",
-                    "JavaScript",
-                    self.script_path,
-                    change.action,
-                    *change.path,
-                ],
-                capture_output=True,
-                text=True,
-                timeout=120,
-            )
-            stdout = result.stdout.strip()
-            stderr = result.stderr.strip()
+            command = [
+                "osascript",
+                "-l",
+                "JavaScript",
+                self.script_path,
+                change.action,
+                *change.path,
+            ]
+            try:
+                result = subprocess.run(
+                    command,
+                    capture_output=True,
+                    text=True,
+                    timeout=120,
+                )
+                stdout = _strip_process_output(result.stdout)
+                stderr = _strip_process_output(result.stderr)
+            except subprocess.TimeoutExpired as exc:
+                failed += 1
+                errors.append(
+                    {
+                        "change": change.to_dict(),
+                        "stdout": _strip_process_output(exc.output),
+                        "stderr": _strip_process_output(exc.stderr) or str(exc),
+                    }
+                )
+                continue
+            except OSError as exc:
+                failed += 1
+                errors.append(
+                    {
+                        "change": change.to_dict(),
+                        "stdout": "",
+                        "stderr": str(exc),
+                    }
+                )
+                continue
 
-            if result.returncode == 0 and "SUCCESS" in result.stdout:
+            if result.returncode == 0 and "SUCCESS" in stdout:
                 applied += 1
                 continue
 

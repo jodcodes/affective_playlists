@@ -2,9 +2,6 @@
 
 const Music = Application("Music");
 Music.includeStandardAdditions = true;
-try {
-  Music.timeout = 600;
-} catch (e) {}
 
 function firstNamed(collection, name) {
   const matches = collection.whose({ name });
@@ -85,8 +82,13 @@ function ensureTargetPlaylist(rootName, genreName, playlistName) {
   return playlist;
 }
 
-function sourceTrackByPersistentID(sourcePersistentID) {
-  const matches = Music.tracks.whose({ persistentID: sourcePersistentID });
+function sourceTrackByPersistentID(trackPID) {
+  const libraryPlaylist = Music.libraryPlaylists[0];
+  if (!libraryPlaylist) {
+    throw new Error("main library playlist not found");
+  }
+
+  const matches = libraryPlaylist.tracks.whose({ persistentID: trackPID });
   return matches.length > 0 ? matches[0] : null;
 }
 
