@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Any, Iterable, List
+from typing import Any
 
 from .curation_models import AssignmentType, CurationAssignment
 
@@ -9,13 +10,16 @@ from .curation_models import AssignmentType, CurationAssignment
 @dataclass(frozen=True)
 class AppleMusicChange:
     action: str
-    path: List[str]
+    path: Sequence[str]
     description: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "path", tuple(self.path))
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "action": self.action,
-            "path": self.path,
+            "path": list(self.path),
             "description": self.description,
         }
 
@@ -27,7 +31,7 @@ class AppleMusicStructurePlanner:
         changes: list[AppleMusicChange] = []
         seen: set[tuple[str, tuple[str, ...]]] = set()
 
-        def add_change(action: str, path: List[str], description: str) -> None:
+        def add_change(action: str, path: Sequence[str], description: str) -> None:
             key = (action, tuple(path))
             if key in seen:
                 return
