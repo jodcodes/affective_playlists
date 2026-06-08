@@ -264,6 +264,7 @@ def run_curation(args=None):
         return 0 if result.get("success") else 1
 
     preview = service.preview_fav_songs()
+    print(info("Preview only - no changes written. Re-run with --apply to write changes."))
     print(info(f"Favourite tracks: {preview['total_assignments']}"))
     print(info(f"Planned changes: {preview['total_changes']}"))
     if preview.get("total_skipped"):
@@ -307,29 +308,45 @@ def main(argv=None):
         epilog=__doc__,
     )
 
-    parser.add_argument(
-        "feature",
-        nargs="?",
-        choices=["temperament", "enrich", "organize", "curate"],
-        help="Feature to run (if not specified, shows interactive menu)",
-    )
+    parser.add_argument("--version", action="version", version="%(prog)s 1.0.0")
 
-    parser.add_argument(
+    parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging")
+
+    subparsers = parser.add_subparsers(dest="feature", metavar="feature")
+
+    def add_feature_parser(name, help_text):
+        feature_parser = subparsers.add_parser(name, help=help_text)
+        feature_parser.add_argument(
+            "-v",
+            "--verbose",
+            action="store_true",
+            default=argparse.SUPPRESS,
+            help=argparse.SUPPRESS,
+        )
+        feature_parser.add_argument(
+            "--version",
+            action="version",
+            version="%(prog)s 1.0.0",
+            help=argparse.SUPPRESS,
+        )
+        return feature_parser
+
+    add_feature_parser("temperament", "Run temperament analysis")
+    add_feature_parser("enrich", "Run metadata enrichment")
+    add_feature_parser("organize", "Run playlist organization")
+
+    curate_parser = add_feature_parser("curate", "Preview/apply Favourite Songs curation")
+    curate_parser.add_argument(
         "--scope",
         choices=["fav_songs"],
         default="fav_songs",
-        help="Curation scope for the curate feature",
+        help="Curation scope",
     )
-
-    parser.add_argument(
+    curate_parser.add_argument(
         "--apply",
         action="store_true",
         help="Apply Favourite Songs curation changes",
     )
-
-    parser.add_argument("--version", action="version", version="%(prog)s 1.0.0")
-
-    parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging")
 
     args = parser.parse_args(argv)
 

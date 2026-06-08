@@ -8,11 +8,40 @@ invoked on non-macOS platforms.
 import os
 import subprocess
 import sys
-from types import SimpleNamespace
 from io import StringIO
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+
+def install_fake_curation_service(monkeypatch, preview=None, apply_result=None):
+    calls = {"constructed": 0, "preview": 0, "apply": []}
+    preview_result = preview or {
+        "total_assignments": 3,
+        "total_changes": 2,
+        "total_skipped": 1,
+    }
+    result = apply_result or {"success": True, "applied": 2, "failed": 0}
+
+    class FakeCurationService:
+        def __init__(self):
+            calls["constructed"] += 1
+
+        def preview_fav_songs(self):
+            calls["preview"] += 1
+            return preview_result
+
+        def apply_fav_songs(self, confirmed):
+            calls["apply"].append(confirmed)
+            return result
+
+    monkeypatch.setitem(
+        sys.modules,
+        "src.curation_service",
+        SimpleNamespace(CurationService=FakeCurationService),
+    )
+    return calls
 
 
 class TestCLIPlatformGuards:
@@ -176,3 +205,68 @@ def test_curate_feature_on_non_macos_exits_without_service(monkeypatch):
 
     assert main.main(["curate"]) == 1
     assert calls == {"constructed": False}
+
+
+def test_curation_apply_without_feature_is_rejected(monkeypatch):
+    import main
+
+    def fail_interactive_menu():
+        raise AssertionError("interactive menu should not run for invalid curation flags")
+
+    monkeypatch.setattr(main, "show_interactive_menu", fail_interactive_menu)
+
+    with pytest.raises(SystemExit) as exc:
+        main.main(["--apply"])
+
+    assert exc.value.code != 0
+
+
+def test_curation_apply_on_other_feature_is_rejected(monkeypatch):
+    import main
+
+    def fail_organization():
+        raise AssertionError("organize should not run with curation-only flags")
+
+    monkeypatch.setattr(main, "run_playlist_organization", fail_organization)
+
+    with pytest.raises(SystemExit) as exc:
+        main.main(["organize", "--apply"])
+
+    assert exc.value.code != 0
+
+
+def test_run_curation_dry_run_previews_without_apply(monkeypatch, capsys):
+    import main
+
+    calls = install_fake_curation_service(monkeypatch)
+    monkeypatch.setattr(main, "IS_MACOS", True)
+
+    assert main.run_curation(SimpleNamespace(apply=False)) == 0
+    assert calls == {"constructed": 1, "preview": 1, "apply": []}
+
+    output = capsys.readouterr().out
+    assert "Preview" in output
+    assert "--apply" in output
+
+
+def test_run_curation_apply_confirms_write(monkeypatch):
+    import main
+
+    calls = install_fake_curation_service(monkeypatch)
+    monkeypatch.setattr(main, "IS_MACOS", True)
+
+    assert main.run_curation(SimpleNamespace(apply=True)) == 0
+    assert calls == {"constructed": 1, "preview": 0, "apply": [True]}
+
+
+def test_run_curation_apply_failure_returns_1(monkeypatch):
+    import main
+
+    calls = install_fake_curation_service(
+        monkeypatch,
+        apply_result={"success": False, "applied": 1, "failed": 1},
+    )
+    monkeypatch.setattr(main, "IS_MACOS", True)
+
+    assert main.run_curation(SimpleNamespace(apply=True)) == 1
+    assert calls == {"constructed": 1, "preview": 0, "apply": [True]}
