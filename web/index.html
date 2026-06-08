@@ -20,6 +20,7 @@
                 <li><a href="#" data-view="enrich" class="nav-link">Enrich</a></li>
                 <li><a href="#" data-view="analyze" class="nav-link">Analyze</a></li>
                 <li><a href="#" data-view="organize" class="nav-link">Organize</a></li>
+                <li><button type="button" class="nav-link" data-view="curation">Curation Review</button></li>
             </ul>
             <div class="nav-actions">
                 <button id="themeToggle" class="btn-icon" title="Toggle theme">☀️</button>
@@ -233,6 +234,41 @@
                     <h3>Organization Results</h3>
                     <p id="organizationResultsSummary"></p>
                     <div id="organizationResultsTable" class="table-container"></div>
+                </div>
+            </section>
+
+            <!-- Curation Review View -->
+            <section id="curation-view" class="view">
+                <div class="curation-header card">
+                    <div>
+                        <h3>Curation Review</h3>
+                        <p class="text-muted">Fav Songs organized as genre folders with four temper playlists per genre.</p>
+                    </div>
+                    <div class="curation-actions">
+                        <button class="btn btn-secondary" id="curation-refresh-btn">Refresh</button>
+                        <button class="btn btn-primary" id="curation-dry-run-btn">Dry Run</button>
+                        <button class="btn btn-secondary" id="curation-apply-btn">Apply</button>
+                    </div>
+                </div>
+
+                <div id="curation-summary" class="curation-summary"></div>
+
+                <div class="curation-layout">
+                    <aside id="curation-genre-tree" class="curation-genre-tree card">
+                        <p class="text-muted">Load a curation preview to review genres.</p>
+                    </aside>
+
+                    <section id="curation-review-panel" class="curation-review-panel">
+                        <div class="card curation-empty-state">
+                            <h3>No Preview Loaded</h3>
+                            <p class="text-muted">Run a dry-run preview to inspect Favourite Songs by genre and temper.</p>
+                        </div>
+                    </section>
+
+                    <aside id="curation-change-panel" class="curation-change-panel card">
+                        <h3>Dry-run Changes</h3>
+                        <p class="text-muted">No changes loaded.</p>
+                    </aside>
                 </div>
             </section>
         </div>

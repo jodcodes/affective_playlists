@@ -55,6 +55,8 @@ const app = {
     },
 };
 
+let curationPreview = null;
+
 // ============================================================================
 // DOM Elements
 // ============================================================================
@@ -107,6 +109,15 @@ const DOM = {
     confirmMoveBtn: () => document.getElementById('confirmMoveBtn'),
     cancelMoveBtn: () => document.getElementById('cancelMoveBtn'),
 
+    // Curation
+    curationRefreshBtn: () => document.getElementById('curation-refresh-btn'),
+    curationDryRunBtn: () => document.getElementById('curation-dry-run-btn'),
+    curationApplyBtn: () => document.getElementById('curation-apply-btn'),
+    curationSummary: () => document.getElementById('curation-summary'),
+    curationGenreTree: () => document.getElementById('curation-genre-tree'),
+    curationReviewPanel: () => document.getElementById('curation-review-panel'),
+    curationChangePanel: () => document.getElementById('curation-change-panel'),
+
     // Modal
     confirmModal: () => document.getElementById('confirmModal'),
     modalBackdrop: () => document.getElementById('modalBackdrop'),
@@ -140,7 +151,10 @@ function showSpinner(show = true) {
 
 function showView(viewName) {
     DOM.views().forEach(view => view.classList.remove('active'));
-    const view = document.getElementById(viewName);
+    const viewIds = {
+        curation: 'curation-view',
+    };
+    const view = document.getElementById(viewIds[viewName] || viewName);
     if (view) {
         view.classList.add('active');
         app.state.currentView = viewName;
@@ -153,6 +167,7 @@ function showView(viewName) {
             enrich: 'Enrich Metadata',
             analyze: 'Analyze Mood',
             organize: 'Organize Playlists',
+            curation: 'Curation Review',
         };
         DOM.pageTitle().textContent = titles[viewName] || viewName;
     }
@@ -196,6 +211,34 @@ function updateStatus() {
         indicator.className = 'status-offline';
         indicator.textContent = '● Offline';
     }
+}
+
+function asArray(value) {
+    return Array.isArray(value) ? value : [];
+}
+
+function asNumber(value, fallback = 0) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : fallback;
+}
+
+function textValue(value, fallback = '') {
+    if (value === null || value === undefined || value === '') {
+        return fallback;
+    }
+    return String(value);
+}
+
+function appendElement(parent, tagName, className, text) {
+    const element = document.createElement(tagName);
+    if (className) {
+        element.className = className;
+    }
+    if (text !== undefined && text !== null) {
+        element.textContent = String(text);
+    }
+    parent.appendChild(element);
+    return element;
 }
 
 // ============================================================================
@@ -503,6 +546,307 @@ async function confirmMove() {
 }
 
 // ============================================================================
+// Curation Review
+// ============================================================================
+
+const CURATION_TEMPERS = ['Frolic', 'Woe', 'Dread', 'Malice'];
+
+async function parseCurationResponse(response) {
+    try {
+        return await response.json();
+    } catch (error) {
+        return {};
+    }
+}
+
+async function loadCurationPreview() {
+    try {
+        showSpinner(true);
+        const response = await fetch('/api/curation/preview?scope=fav_songs');
+        const preview = await parseCurationResponse(response);
+
+        if (!response.ok) {
+            throw new Error(preview.error || `HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        curationPreview = preview;
+        renderCurationPreview(preview);
+        app.state.isOnline = true;
+        updateStatus();
+    } catch (error) {
+        curationPreview = null;
+        renderCurationError('Unable to load curation preview.');
+        showAlert('Failed to load curation preview: ' + error.message, 'danger');
+    } finally {
+        showSpinner(false);
+    }
+}
+
+function groupCurationAssignments(assignments) {
+    const groupsByGenre = new Map();
+
+    assignments.forEach(assignment => {
+        if (!assignment || typeof assignment !== 'object') {
+            return;
+        }
+
+        const genre = textValue(assignment.genre_label || assignment.genre, 'Other');
+        if (!groupsByGenre.has(genre)) {
+            groupsByGenre.set(genre, []);
+        }
+        groupsByGenre.get(genre).push(assignment);
+    });
+
+    return Array.from(groupsByGenre.entries())
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([genre, items], index) => ({
+            genre,
+            id: `curation-genre-${index}`,
+            items: items.slice().sort((left, right) => {
+                const leftName = textValue((left && left.item_name) || (left && left.name), 'Unnamed');
+                const rightName = textValue((right && right.item_name) || (right && right.name), 'Unnamed');
+                return leftName.localeCompare(rightName);
+            }),
+        }));
+}
+
+function renderCurationPreview(preview) {
+    const summary = DOM.curationSummary();
+    const tree = DOM.curationGenreTree();
+    const reviewPanel = DOM.curationReviewPanel();
+    const changePanel = DOM.curationChangePanel();
+
+    if (!summary || !tree || !reviewPanel || !changePanel) {
+        return;
+    }
+
+    const assignments = asArray(preview && preview.assignments);
+    const changes = asArray(preview && preview.changes);
+    const skippedTracks = asArray(preview && preview.skipped_tracks);
+    const groups = groupCurationAssignments(assignments);
+    const totalAssignments = asNumber(
+        preview && preview.total_assignments !== undefined
+            ? preview.total_assignments
+            : assignments.length
+    );
+    const totalChanges = asNumber(
+        preview && preview.total_changes !== undefined
+            ? preview.total_changes
+            : changes.length
+    );
+    const totalSkipped = asNumber(
+        preview && preview.total_skipped !== undefined
+            ? preview.total_skipped
+            : skippedTracks.length
+    );
+
+    renderCurationSummary(summary, {
+        totalAssignments,
+        totalGenres: groups.length,
+        totalChanges,
+        totalSkipped,
+    });
+    renderCurationGenreTree(tree, groups);
+    renderCurationReviewPanel(reviewPanel, groups);
+    renderCurationChangePanel(changePanel, changes, skippedTracks, totalSkipped);
+}
+
+function renderCurationSummary(summary, counts) {
+    summary.replaceChildren();
+
+    [
+        ['Assignments', counts.totalAssignments],
+        ['Genres', counts.totalGenres],
+        ['Dry-run Changes', counts.totalChanges],
+        ['Skipped', counts.totalSkipped],
+    ].forEach(([label, value]) => {
+        const item = appendElement(summary, 'div', 'curation-summary-item');
+        appendElement(item, 'div', 'curation-summary-number', value);
+        appendElement(item, 'div', 'curation-summary-label', label);
+    });
+}
+
+function renderCurationGenreTree(tree, groups) {
+    tree.replaceChildren();
+    appendElement(tree, 'h3', null, 'Genres');
+
+    if (!groups.length) {
+        appendElement(tree, 'p', 'text-muted', 'No genres found in this preview.');
+        return;
+    }
+
+    const list = appendElement(tree, 'div', 'curation-genre-list');
+    groups.forEach(group => {
+        const button = appendElement(list, 'button', 'curation-genre-link');
+        button.type = 'button';
+        const label = appendElement(button, 'span', null, group.genre);
+        label.title = group.genre;
+        appendElement(button, 'span', 'curation-count-badge', group.items.length);
+        button.addEventListener('click', () => {
+            const target = document.getElementById(group.id);
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    });
+}
+
+function renderCurationReviewPanel(panel, groups) {
+    panel.replaceChildren();
+
+    if (!groups.length) {
+        const empty = appendElement(panel, 'div', 'card curation-empty-state');
+        appendElement(empty, 'h3', null, 'No Favourite Songs Found');
+        appendElement(empty, 'p', 'text-muted', 'The preview returned no curation assignments.');
+        return;
+    }
+
+    groups.forEach(group => {
+        const section = appendElement(panel, 'section', 'card curation-genre-section');
+        section.id = group.id;
+        const header = appendElement(section, 'div', 'curation-genre-header');
+        appendElement(header, 'h3', null, group.genre);
+        appendElement(header, 'span', 'curation-count-badge', group.items.length);
+
+        const grid = appendElement(section, 'div', 'curation-temper-grid');
+        CURATION_TEMPERS.forEach(temper => {
+            const column = appendElement(grid, 'div', 'curation-temper-column');
+            const columnHeader = appendElement(column, 'div', 'curation-temper-header');
+            const temperItems = group.items.filter(item => textValue(item && item.temperament) === temper);
+
+            appendElement(columnHeader, 'h4', null, temper);
+            appendElement(columnHeader, 'span', 'curation-count-badge', temperItems.length);
+
+            if (!temperItems.length) {
+                appendElement(column, 'p', 'curation-empty-column', 'No tracks');
+                return;
+            }
+
+            temperItems.forEach(item => {
+                const card = appendElement(column, 'div', 'curation-track-card');
+                const itemName = textValue((item && item.item_name) || (item && item.name), 'Unnamed track');
+                const targetPath = asArray(item && item.target_path).map(part => textValue(part)).join(' / ');
+
+                appendElement(card, 'div', 'curation-track-name', itemName);
+                appendElement(card, 'div', 'curation-target-path', targetPath || 'No target path');
+            });
+        });
+    });
+}
+
+function renderCurationChangePanel(panel, changes, skippedTracks, totalSkipped) {
+    panel.replaceChildren();
+    appendElement(panel, 'h3', null, 'Dry-run Changes');
+
+    if (!changes.length) {
+        appendElement(panel, 'p', 'text-muted', 'No dry-run changes returned.');
+    } else {
+        const list = appendElement(panel, 'div', 'curation-change-list');
+        changes.forEach(change => {
+            const item = appendElement(list, 'div', 'curation-change-item');
+            const action = textValue(change && change.action, 'change');
+            const description = textValue(change && change.description, 'Change planned');
+            const path = asArray(change && change.path).map(part => textValue(part)).join(' / ');
+
+            appendElement(item, 'span', 'curation-action-badge', action.replace(/_/g, ' '));
+            appendElement(item, 'div', 'curation-change-description', description);
+            if (path) {
+                appendElement(item, 'div', 'curation-target-path', path);
+            }
+        });
+    }
+
+    if (totalSkipped > 0 || skippedTracks.length > 0) {
+        const skipped = appendElement(panel, 'div', 'curation-skipped-section');
+        appendElement(skipped, 'h3', null, `Skipped Tracks (${totalSkipped || skippedTracks.length})`);
+
+        if (!skippedTracks.length) {
+            appendElement(skipped, 'p', 'text-muted', 'Skipped track details were not returned.');
+            return;
+        }
+
+        skippedTracks.forEach(track => {
+            const row = appendElement(skipped, 'div', 'curation-skipped-item');
+            const name = textValue((track && track.name) || (track && track.item_name), 'Unnamed track');
+            const details = [
+                textValue(track && track.artist),
+                textValue(track && track.genre),
+                textValue(track && track.reason, 'skipped'),
+            ].filter(Boolean).join(' - ');
+
+            appendElement(row, 'div', 'curation-track-name', name);
+            appendElement(row, 'div', 'curation-target-path', details);
+        });
+    }
+}
+
+function renderCurationError(message) {
+    const summary = DOM.curationSummary();
+    const tree = DOM.curationGenreTree();
+    const reviewPanel = DOM.curationReviewPanel();
+    const changePanel = DOM.curationChangePanel();
+
+    if (!summary || !tree || !reviewPanel || !changePanel) {
+        return;
+    }
+
+    renderCurationSummary(summary, {
+        totalAssignments: 0,
+        totalGenres: 0,
+        totalChanges: 0,
+        totalSkipped: 0,
+    });
+
+    tree.replaceChildren();
+    appendElement(tree, 'h3', null, 'Genres');
+    appendElement(tree, 'p', 'text-muted', 'No preview loaded.');
+
+    reviewPanel.replaceChildren();
+    const empty = appendElement(reviewPanel, 'div', 'card curation-empty-state');
+    appendElement(empty, 'h3', null, 'Preview Unavailable');
+    appendElement(empty, 'p', 'text-muted', message);
+
+    changePanel.replaceChildren();
+    appendElement(changePanel, 'h3', null, 'Dry-run Changes');
+    appendElement(changePanel, 'p', 'text-muted', 'No changes loaded.');
+}
+
+async function applyFavSongsCuration() {
+    const confirmed = window.confirm(
+        'Apply Favourite Songs curation in Apple Music? This can create folders, playlists, and copy tracks.'
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    try {
+        showSpinner(true);
+        const response = await fetch('/api/curation/apply', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ scope: 'fav_songs', confirmed: true }),
+        });
+        const result = await parseCurationResponse(response);
+
+        if (!response.ok || result.success === false) {
+            throw new Error(result.error || `HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const applied = asNumber(result.applied);
+        const failed = asNumber(result.failed);
+        showAlert(`Applied ${applied} curation change${applied === 1 ? '' : 's'}${failed ? `, ${failed} failed` : ''}.`, 'success');
+        await loadCurationPreview();
+    } catch (error) {
+        showAlert('Failed to apply curation: ' + error.message, 'danger');
+    } finally {
+        showSpinner(false);
+    }
+}
+
+// ============================================================================
 // Event Listeners
 // ============================================================================
 
@@ -519,6 +863,7 @@ function setupEventListeners() {
             // Load view-specific data
             if (view === 'playlists') loadPlaylists();
             if (view === 'dashboard') loadDashboard();
+            if (view === 'curation') loadCurationPreview();
         });
     });
 
@@ -552,6 +897,17 @@ function setupEventListeners() {
     DOM.cancelMoveBtn().addEventListener('click', () => {
         DOM.organizationPreview().style.display = 'none';
     });
+
+    // Curation
+    if (DOM.curationRefreshBtn()) {
+        DOM.curationRefreshBtn().addEventListener('click', loadCurationPreview);
+    }
+    if (DOM.curationDryRunBtn()) {
+        DOM.curationDryRunBtn().addEventListener('click', loadCurationPreview);
+    }
+    if (DOM.curationApplyBtn()) {
+        DOM.curationApplyBtn().addEventListener('click', applyFavSongsCuration);
+    }
 }
 
 // ============================================================================
@@ -577,6 +933,9 @@ async function init() {
         // Restore last view
         const lastView = localStorage.getItem('affective_view') || 'dashboard';
         showView(lastView);
+        if (lastView === 'curation') {
+            loadCurationPreview();
+        }
     } catch (error) {
         showAlert('Failed to initialize application: ' + error.message, 'danger');
         app.state.isOnline = false;

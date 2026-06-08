@@ -160,6 +160,12 @@ small, .text-sm {
     cursor: pointer;
 }
 
+button.nav-link {
+    background: none;
+    border: 0;
+    font: inherit;
+}
+
 .nav-link:hover,
 .nav-link.active {
     color: var(--color-primary);
@@ -198,6 +204,8 @@ small, .text-sm {
         padding: var(--spacing);
         border-radius: 0;
         border-bottom: 1px solid var(--border-color);
+        width: 100%;
+        text-align: left;
     }
 
     .hamburger {
@@ -659,6 +667,228 @@ label {
 }
 
 /* ============================================================================
+   Curation Review
+   ============================================================================ */
+
+.curation-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--spacing);
+}
+
+.curation-header h3,
+.curation-header p {
+    margin-bottom: 0;
+}
+
+.curation-header h3 + p {
+    margin-top: 6px;
+}
+
+.curation-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.curation-summary {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(120px, 1fr));
+    gap: var(--spacing);
+    margin-bottom: var(--spacing);
+}
+
+.curation-summary-item {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 12px;
+    min-width: 0;
+}
+
+.curation-summary-number {
+    color: var(--color-primary);
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.curation-summary-label {
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    overflow-wrap: anywhere;
+}
+
+.curation-layout {
+    display: grid;
+    grid-template-columns: minmax(160px, 220px) minmax(0, 1fr) minmax(240px, 300px);
+    gap: var(--spacing);
+    align-items: start;
+}
+
+.curation-genre-tree,
+.curation-change-panel {
+    position: sticky;
+    top: 88px;
+    max-height: calc(100vh - 112px);
+    overflow-y: auto;
+}
+
+.curation-genre-list,
+.curation-change-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.curation-genre-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: calc(var(--radius) / 2);
+    background-color: var(--bg-page);
+    color: var(--text-primary);
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+    transition: var(--transition);
+}
+
+.curation-genre-link:hover {
+    background-color: var(--bg-hover);
+    border-color: var(--color-primary);
+}
+
+.curation-genre-link span:first-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.curation-review-panel {
+    min-width: 0;
+}
+
+.curation-genre-section {
+    scroll-margin-top: 90px;
+}
+
+.curation-genre-header,
+.curation-temper-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.curation-genre-header h3,
+.curation-temper-header h4 {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.curation-temper-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.curation-temper-column {
+    min-width: 0;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    background-color: var(--bg-page);
+    padding: 10px;
+}
+
+.curation-temper-header h4 {
+    font-size: var(--font-size-base);
+}
+
+.curation-track-card,
+.curation-change-item,
+.curation-skipped-item {
+    border: 1px solid var(--border-color);
+    border-radius: calc(var(--radius) / 2);
+    background-color: var(--bg-hover);
+    padding: 8px;
+    margin-top: 8px;
+    min-width: 0;
+}
+
+.curation-track-name {
+    color: var(--text-primary);
+    font-weight: 600;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.curation-target-path,
+.curation-change-description,
+.curation-empty-column {
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    line-height: 1.4;
+    margin-top: 4px;
+    overflow-wrap: anywhere;
+}
+
+.curation-empty-column {
+    margin-bottom: 0;
+}
+
+.curation-count-badge,
+.curation-action-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    min-width: 24px;
+    min-height: 22px;
+    padding: 2px 8px;
+    border-radius: calc(var(--radius) / 2);
+    background-color: rgba(99, 102, 241, 0.12);
+    color: var(--color-primary);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.2;
+    text-transform: none;
+}
+
+.curation-action-badge {
+    justify-content: flex-start;
+    width: fit-content;
+    margin-bottom: 6px;
+    text-transform: capitalize;
+}
+
+.curation-skipped-section {
+    margin-top: calc(var(--spacing) * 1.5);
+    padding-top: var(--spacing);
+    border-top: 1px solid var(--border-color);
+}
+
+.curation-skipped-section h3 {
+    margin-bottom: 8px;
+}
+
+.curation-empty-state h3 {
+    margin-bottom: 8px;
+}
+
+.curation-empty-state p {
+    margin-bottom: 0;
+}
+
+/* ============================================================================
    Spinner
    ============================================================================ */
 
@@ -762,6 +992,22 @@ label {
    Responsive Design
    ============================================================================ */
 
+@media (max-width: 1024px) {
+    .curation-layout {
+        grid-template-columns: minmax(170px, 220px) minmax(0, 1fr);
+    }
+
+    .curation-change-panel {
+        grid-column: 1 / -1;
+        position: static;
+        max-height: none;
+    }
+
+    .curation-temper-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
 @media (max-width: 768px) {
     :root {
         --spacing: 12px;
@@ -803,6 +1049,31 @@ label {
         width: 100%;
     }
 
+    .curation-header {
+        flex-direction: column;
+    }
+
+    .curation-actions,
+    .curation-actions .btn {
+        width: 100%;
+    }
+
+    .curation-layout,
+    .curation-summary,
+    .curation-temper-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .curation-genre-tree {
+        position: static;
+        max-height: none;
+    }
+
+    .curation-genre-list {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .table {
         font-size: 12px;
     }
@@ -833,6 +1104,10 @@ label {
 
     .action-buttons .btn {
         width: 100%;
+    }
+
+    .curation-genre-list {
+        grid-template-columns: 1fr;
     }
 
     .modal-buttons {
