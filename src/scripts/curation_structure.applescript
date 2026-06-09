@@ -106,13 +106,13 @@ end ensureGenreFolder
 on ensureTargetPlaylist(rootName, genreName, playlistName)
     tell application "Music"
         set genreFolder to my ensureGenreFolder(rootName, genreName)
-        set targetPlaylist to my findUserPlaylistByNameAndParent(playlistName, genreName)
+        set targetPlaylist to my findUserPlaylistByFullPath(playlistName, genreName, rootName)
         if targetPlaylist is not missing value then
             return targetPlaylist
         end if
 
         make new user playlist at genreFolder with properties {name:playlistName}
-        set targetPlaylist to my findUserPlaylistByNameAndParent(playlistName, genreName)
+        set targetPlaylist to my findUserPlaylistByFullPath(playlistName, genreName, rootName)
         if targetPlaylist is missing value then
             error "Could not create playlist " & playlistName
         end if
@@ -134,19 +134,19 @@ on findFolderByNameAndParent(folderName, parentName)
     return missing value
 end findFolderByNameAndParent
 
-on findUserPlaylistByNameAndParent(playlistName, parentName)
+on findUserPlaylistByFullPath(playlistName, genreName, rootName)
     tell application "Music"
         set matches to every user playlist whose name is playlistName
         repeat with candidate in matches
             try
-                if name of parent of candidate is parentName then
+                if name of parent of candidate is genreName and name of parent of parent of candidate is rootName then
                     return contents of candidate
                 end if
             end try
         end repeat
     end tell
     return missing value
-end findUserPlaylistByNameAndParent
+end findUserPlaylistByFullPath
 
 on sourceTrackByPersistentID(trackPID)
     tell application "Music"

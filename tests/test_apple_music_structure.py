@@ -272,6 +272,17 @@ def test_applescript_copy_track_searches_favourite_songs_before_library():
     assert script.index(favourite_lookup) < script.index(library_lookup)
 
 
+def test_applescript_playlist_lookup_validates_full_root_genre_path():
+    script = Path("src/scripts/curation_structure.applescript").read_text(
+        encoding="utf-8"
+    )
+
+    assert "findUserPlaylistByFullPath(playlistName, genreName, rootName)" in script
+    assert "name of parent of candidate is genreName" in script
+    assert "name of parent of parent of candidate is rootName" in script
+    assert "findUserPlaylistByNameAndParent(playlistName, genreName)" not in script
+
+
 def test_curation_structure_no_arg_guard_returns_fast_error():
     if shutil.which("osascript") is None:
         pytest.skip("osascript is not available")
