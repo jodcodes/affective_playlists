@@ -8,11 +8,11 @@ References: openspec/specs/realtime/spec.md
 
 import json
 import time
-from datetime import datetime
 from typing import Dict, Optional, Set
 
 from flask import request
 
+from src.db import utc_now
 from src.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -104,7 +104,7 @@ class RealtimeManager:
             "current_operation": current_operation,
             "elapsed_seconds": elapsed_seconds,
             "eta_seconds": eta_seconds,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": utc_now().isoformat(),
         }
 
         self._broadcast(job_id, event)
@@ -128,7 +128,7 @@ class RealtimeManager:
             "status": "completed",
             "duration_seconds": duration_seconds,
             "result_summary": result_summary or {},
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": utc_now().isoformat(),
         }
 
         self._broadcast(job_id, event)
@@ -155,7 +155,7 @@ class RealtimeManager:
             "error_message": error_message,
             "error_code": error_code,
             "duration_seconds": duration_seconds,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": utc_now().isoformat(),
         }
 
         self._broadcast(job_id, event)
@@ -176,7 +176,7 @@ class RealtimeManager:
             "job_id": job_id,
             "status": "cancelled",
             "progress": progress,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": utc_now().isoformat(),
         }
 
         self._broadcast(job_id, event)
@@ -189,7 +189,7 @@ class RealtimeManager:
         """
         event = {
             "event": "heartbeat",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": utc_now().isoformat(),
         }
         # Note: In real implementation with SocketIO, this would send
         # Logger for now

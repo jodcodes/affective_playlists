@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
-from src.db import Job, JobEvent, JobResult, JobStatistics, get_session
+from src.db import Job, JobEvent, JobResult, JobStatistics, get_session, utc_now
 from src.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -54,8 +54,8 @@ class JobStore:
                 payload=payload,
                 user_agent=user_agent,
                 client_ip=client_ip,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                created_at=utc_now(),
+                updated_at=utc_now(),
             )
 
             self.session.add(job)
@@ -109,12 +109,12 @@ class JobStore:
 
             old_status = job.status
             job.status = new_status
-            job.updated_at = datetime.utcnow()
+            job.updated_at = utc_now()
 
             if new_status == "running" and job.started_at is None:
-                job.started_at = datetime.utcnow()
+                job.started_at = utc_now()
             elif new_status in ["completed", "failed", "cancelled", "timeout"]:
-                job.completed_at = datetime.utcnow()
+                job.completed_at = utc_now()
 
             if error_message:
                 job.error_message = error_message
@@ -161,7 +161,7 @@ class JobStore:
             job.progress = min(100, max(0, progress))
             job.current_track = current_track
             job.total_tracks = total_tracks
-            job.updated_at = datetime.utcnow()
+            job.updated_at = utc_now()
 
             self.session.commit()
 
@@ -206,7 +206,7 @@ class JobStore:
                 job_id=job_id,
                 result_json=result_json,
                 result_metadata=result_metadata or {"format": "auto", "version": 1},
-                stored_at=datetime.utcnow(),
+                stored_at=utc_now(),
                 result_size_bytes=len(json.dumps(result_json)),
             )
 
@@ -294,7 +294,7 @@ class JobStore:
                 return False
 
             if soft_delete:
-                job.deleted_at = datetime.utcnow()
+                job.deleted_at = utc_now()
                 logger.info(f"Soft deleted job: {job_id}")
             else:
                 self.session.delete(job)
@@ -317,7 +317,8 @@ class JobStore:
             Number of jobs archived
         """
         try:
-            cutoff_date = datetime.utcnow() - timedelta(days=retention_days)
+            now = utc_now()
+            cutoff_date = now - timedelta(days=retention_days)
 
             # Find old jobs without retain_until override
             old_jobs = (
@@ -325,13 +326,13 @@ class JobStore:
                 .filter(
                     Job.created_at < cutoff_date,
                     Job.deleted_at.is_(None),
-                    (Job.retain_until.is_(None) | (Job.retain_until < datetime.utcnow())),
+                    (Job.retain_until.is_(None) | (Job.retain_until < now)),
                 )
                 .all()
             )
 
             for job in old_jobs:
-                job.deleted_at = datetime.utcnow()
+                job.deleted_at = utc_now()
 
             self.session.commit()
             logger.info(f"Archived {len(old_jobs)} jobs older than {retention_days} days")
@@ -357,7 +358,7 @@ class JobStore:
             if not job:
                 return False
 
-            job.retain_until = datetime.utcnow() + timedelta(days=days)
+            job.retain_until = utc_now() + timedelta(days=days)
             self.session.commit()
             logger.info(f"Set retention for {job_id} to {days} days")
 
@@ -379,7 +380,7 @@ class JobStore:
             event = JobEvent(
                 job_id=job_id,
                 event_type=event_type,
-                timestamp=datetime.utcnow(),
+                timestamp=utc_now(),
                 details=details,
             )
             self.session.add(event)

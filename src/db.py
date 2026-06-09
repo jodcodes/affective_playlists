@@ -5,7 +5,7 @@ References: openspec/specs/job-persistence/spec.md
 """
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional, Type
 
 from sqlalchemy import JSON, Column, DateTime, Integer, String, Text, create_engine
@@ -16,6 +16,11 @@ from src.logger import setup_logger
 logger = setup_logger(__name__)
 
 Base: Type[Any] = declarative_base()  # type: ignore[assignment]
+
+
+def utc_now() -> datetime:
+    """Return a timezone-aware UTC timestamp."""
+    return datetime.now(timezone.utc)
 
 
 class Job(Base):
@@ -36,8 +41,8 @@ class Job(Base):
     payload = Column(JSON, nullable=True)  # Input parameters
 
     # Timing
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=utc_now, index=True)
+    updated_at = Column(DateTime, nullable=False, default=utc_now, onupdate=utc_now)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     deleted_at = Column(DateTime, nullable=True)  # Soft delete timestamp
@@ -93,7 +98,7 @@ class JobResult(Base):
     result_metadata = Column(JSON, nullable=True)  # result format version, etc.
 
     # Storage tracking
-    stored_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    stored_at = Column(DateTime, nullable=False, default=utc_now)
     result_size_bytes = Column(Integer, nullable=True)
 
     def __repr__(self):
@@ -118,7 +123,7 @@ class Playlist(Base):
     classified = Column(String(50), nullable=True, default=None)  # genre classification result
     enriched = Column(String(50), default="pending")  # pending, in_progress, completed, failed
     last_synced = Column(
-        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, nullable=False, default=utc_now, onupdate=utc_now
     )
     last_modified = Column(DateTime, nullable=True)
 
@@ -147,7 +152,7 @@ class JobEvent(Base):
 
     # Event tracking
     event_type = Column(String(50), nullable=False)  # status_change, progress_update, error, etc.
-    timestamp = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    timestamp = Column(DateTime, nullable=False, default=utc_now, index=True)
     details = Column(JSON, nullable=True)  # event-specific data
 
     def __repr__(self):
@@ -172,7 +177,7 @@ class JobStatistics(Base):
     min_duration_seconds = Column(Integer, nullable=True)
     max_duration_seconds = Column(Integer, nullable=True)
 
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=utc_now, onupdate=utc_now)
 
     def __repr__(self):
         return f"<JobStatistics(type={self.job_type}, completed={self.total_completed})>"
