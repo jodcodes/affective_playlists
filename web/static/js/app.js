@@ -804,7 +804,7 @@ function renderCurationControlCenter(snapshot) {
         totalSkipped,
     });
     renderCurationMatrix(reviewPanel, grouped);
-    renderCurationWritePanel(changePanel, snapshot, changes, skippedTracks, totalSkipped);
+    renderCurationWritePanel(snapshot, curationSmokeTest);
 }
 
 function renderCurationSystemStatus(snapshot) {
@@ -878,21 +878,42 @@ function renderCurationMatrix(panel, grouped) {
     });
 }
 
-function renderCurationWritePanel(panel, snapshot, changes, skippedTracks, totalSkipped) {
+function renderCurationWritePanel(snapshot, smokeTest = curationSmokeTest) {
+    const panel = DOM.curationChangePanel();
+    if (!panel) {
+        return;
+    }
+
+    const changes = asArray(snapshot && snapshot.changes);
+    const skippedTracks = asArray(snapshot && snapshot.skipped_tracks);
+    const totalSkipped = asNumber(
+        snapshot && snapshot.total_skipped !== undefined
+            ? snapshot.total_skipped
+            : skippedTracks.length
+    );
+
     panel.replaceChildren();
     appendElement(panel, 'h3', null, 'Write Safety');
 
     if (!snapshot || !snapshot.available) {
-        appendElement(panel, 'p', 'text-muted', 'No snapshot is available. Load an existing snapshot or refresh from Music.app.');
+        appendElement(panel, 'p', 'text-muted', 'Snapshot: missing. Refresh before mini-test or apply.');
+        appendElement(panel, 'p', 'text-muted', 'Mini-test: not run.');
         return;
     }
 
     if (!snapshot.fresh) {
-        appendElement(panel, 'p', 'text-muted', 'Snapshot is stale. Refresh before smoke testing or applying changes.');
-    } else if (!(curationSmokeTest && curationSmokeTest.success)) {
-        appendElement(panel, 'p', 'text-muted', 'Run the mini-test before full apply is enabled.');
+        appendElement(panel, 'p', 'text-muted', 'Snapshot: stale. Refresh before mini-test or apply.');
     } else {
-        appendElement(panel, 'p', 'text-muted', 'Mini-test passed. Full apply is available.');
+        appendElement(panel, 'p', 'text-muted', 'Snapshot: fresh.');
+    }
+
+    if (!smokeTest) {
+        appendElement(panel, 'p', 'text-muted', 'Mini-test: not run. Full apply is locked.');
+    } else if (smokeTest.success) {
+        appendElement(panel, 'p', 'status-success', 'Mini-test: passed. Full apply is available.');
+    } else {
+        const error = textValue(smokeTest.error, 'Unknown error');
+        appendElement(panel, 'p', 'status-danger', `Mini-test: failed. ${error}`);
     }
 
     renderCurationChangePanel(panel, changes, skippedTracks, totalSkipped, true);
@@ -1063,6 +1084,34 @@ function renderCurationError(message) {
     appendElement(changePanel, 'p', 'text-muted', 'No changes loaded.');
 }
 
+async function runCurationSmokeTest() {
+    if (!curationSnapshot || !curationSnapshot.fresh) {
+        showAlert('Refresh the curation snapshot before running the mini-test.', 'warning');
+        return;
+    }
+
+    curationApplyInFlight = true;
+    setCurationButtonsState();
+
+    try {
+        const result = await app.api('/curation/smoke-test', {
+            method: 'POST',
+            body: { scope: 'fav_songs' },
+        });
+
+        curationSmokeTest = result;
+        renderCurationWritePanel(curationSnapshot, result);
+        showAlert('Mini-test completed and cleaned up.', 'success');
+    } catch (error) {
+        curationSmokeTest = { success: false, error: error.message };
+        renderCurationWritePanel(curationSnapshot, curationSmokeTest);
+        showAlert('Mini-test failed: ' + error.message, 'danger');
+    } finally {
+        curationApplyInFlight = false;
+        setCurationButtonsState();
+    }
+}
+
 async function applyFavSongsCuration() {
     if (curationApplyInFlight || curationPreviewLoading || curationRefreshLoading) {
         return;
@@ -1166,6 +1215,9 @@ function setupEventListeners() {
     }
     if (DOM.curationDryRunBtn()) {
         DOM.curationDryRunBtn().addEventListener('click', loadCurationPreview);
+    }
+    if (DOM.curationSmokeTestBtn()) {
+        DOM.curationSmokeTestBtn().addEventListener('click', runCurationSmokeTest);
     }
     if (DOM.curationGenreFilter()) {
         DOM.curationGenreFilter().addEventListener('input', () => {
