@@ -864,7 +864,7 @@ function renderCurationMatrix(panel, grouped) {
 
     const matrix = appendElement(panel, 'div', 'curation-matrix');
     const header = appendElement(matrix, 'div', 'curation-matrix-row curation-matrix-header');
-    ['Genre', ...CURATION_TEMPERS, 'Status'].forEach(label => {
+    ['Genre', ...CURATION_TEMPERS, 'Total / Status'].forEach(label => {
         appendElement(header, 'div', null, label);
     });
 
@@ -874,7 +874,7 @@ function renderCurationMatrix(panel, grouped) {
         CURATION_TEMPERS.forEach(temper => {
             appendElement(rowEl, 'div', null, row.counts[temper]);
         });
-        appendElement(rowEl, 'div', null, row.status);
+        appendElement(rowEl, 'div', null, `${row.total} ${row.status}`);
     });
 }
 
