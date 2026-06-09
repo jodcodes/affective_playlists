@@ -13,6 +13,7 @@ from src.curation_models import (
     CurationAssignment,
     TemperBucket,
 )
+from src.curation_snapshot import CurationSnapshotStore
 from src.curation_store import CurationStore
 
 
@@ -45,12 +46,14 @@ class CurationService:
         apple_music: Optional[AppleMusicInterface] = None,
         temper_classifier: Optional[KeywordTemperClassifier] = None,
         store: Optional[CurationStore] = None,
+        snapshot_store: Optional[CurationSnapshotStore] = None,
         planner: Optional[AppleMusicStructurePlanner] = None,
         applier: Optional[AppleMusicStructureApplier] = None,
     ) -> None:
         self.apple_music = apple_music or AppleMusicInterface()
         self.temper_classifier = temper_classifier or KeywordTemperClassifier()
         self.store = store or CurationStore()
+        self.snapshot_store = snapshot_store or CurationSnapshotStore()
         self.planner = planner or AppleMusicStructurePlanner()
         self.applier = applier or AppleMusicStructureApplier()
 
@@ -100,6 +103,29 @@ class CurationService:
             "total_changes": len(changes),
             "skipped_tracks": skipped_tracks,
             "total_skipped": len(skipped_tracks),
+        }
+
+    def get_fav_songs_snapshot(self) -> Dict[str, Any]:
+        return self.snapshot_store.load_snapshot("fav_songs")
+
+    def refresh_fav_songs_snapshot(self) -> Dict[str, Any]:
+        preview = self.preview_fav_songs()
+        payload = self._snapshot_payload(preview)
+        return self.snapshot_store.save_snapshot("fav_songs", payload)
+
+    def _snapshot_payload(self, preview: Dict[str, Any]) -> Dict[str, Any]:
+        grouped = preview.get("grouped") or {}
+        changes = preview.get("changes") or []
+        skipped_tracks = preview.get("skipped_tracks") or []
+        return {
+            "scope": "fav_songs",
+            "total_assignments": int(preview.get("total_assignments") or 0),
+            "total_genres": len(grouped),
+            "total_changes": int(preview.get("total_changes") or len(changes)),
+            "total_skipped": int(preview.get("total_skipped") or len(skipped_tracks)),
+            "grouped": grouped,
+            "changes": changes,
+            "skipped_tracks": skipped_tracks,
         }
 
     def _group_assignments(
