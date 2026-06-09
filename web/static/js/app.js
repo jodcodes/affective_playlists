@@ -58,6 +58,9 @@ const app = {
 let curationPreview = null;
 let curationPreviewLoading = false;
 let curationApplyInFlight = false;
+let curationSnapshot = null;
+let curationSmokeTest = null;
+let curationRefreshLoading = false;
 
 // ============================================================================
 // DOM Elements
@@ -112,13 +115,17 @@ const DOM = {
     cancelMoveBtn: () => document.getElementById('cancelMoveBtn'),
 
     // Curation
+    curationLoadSnapshotBtn: () => document.getElementById('curation-load-snapshot-btn'),
     curationRefreshBtn: () => document.getElementById('curation-refresh-btn'),
     curationDryRunBtn: () => document.getElementById('curation-dry-run-btn'),
+    curationSmokeTestBtn: () => document.getElementById('curation-smoke-test-btn'),
     curationApplyBtn: () => document.getElementById('curation-apply-btn'),
     curationSummary: () => document.getElementById('curation-summary'),
     curationGenreTree: () => document.getElementById('curation-genre-tree'),
     curationReviewPanel: () => document.getElementById('curation-review-panel'),
     curationChangePanel: () => document.getElementById('curation-change-panel'),
+    curationSystemStatus: () => document.getElementById('curation-system-status'),
+    curationGenreFilter: () => document.getElementById('curation-genre-filter'),
 
     // Modal
     confirmModal: () => document.getElementById('confirmModal'),
@@ -554,22 +561,95 @@ async function confirmMove() {
 // Curation Review
 // ============================================================================
 
-const CURATION_TEMPERS = ['Frolic', 'Woe', 'Dread', 'Malice'];
+const CURATION_TEMPERS = ['Woe', 'Frolic', 'Dread', 'Malice'];
+
+function hasFreshCurationSnapshot() {
+    return Boolean(curationSnapshot && curationSnapshot.available && curationSnapshot.fresh);
+}
 
 function setCurationButtonsState() {
-    const isBusy = curationPreviewLoading || curationApplyInFlight;
+    const isBusy = curationPreviewLoading || curationRefreshLoading || curationApplyInFlight;
+    const hasFreshSnapshot = hasFreshCurationSnapshot();
+    const loadSnapshotBtn = DOM.curationLoadSnapshotBtn();
     const refreshBtn = DOM.curationRefreshBtn();
     const dryRunBtn = DOM.curationDryRunBtn();
+    const smokeTestBtn = DOM.curationSmokeTestBtn();
     const applyBtn = DOM.curationApplyBtn();
 
+    if (loadSnapshotBtn) {
+        loadSnapshotBtn.disabled = isBusy;
+    }
     if (refreshBtn) {
         refreshBtn.disabled = isBusy;
     }
     if (dryRunBtn) {
         dryRunBtn.disabled = isBusy;
     }
+    if (smokeTestBtn) {
+        smokeTestBtn.disabled = isBusy || !hasFreshSnapshot;
+    }
     if (applyBtn) {
-        applyBtn.disabled = isBusy || !curationPreview;
+        applyBtn.disabled = isBusy || !hasFreshSnapshot || !(curationSmokeTest && curationSmokeTest.success);
+    }
+}
+
+async function loadCurationSnapshot() {
+    if (curationPreviewLoading || curationRefreshLoading || curationApplyInFlight) {
+        return;
+    }
+
+    curationPreviewLoading = true;
+    setCurationButtonsState();
+
+    try {
+        const snapshot = await app.api('/curation/snapshot?scope=fav_songs');
+
+        curationSnapshot = snapshot;
+        curationPreview = snapshot && snapshot.available ? snapshot : null;
+        renderCurationControlCenter(snapshot);
+        app.state.isOnline = true;
+        updateStatus();
+    } catch (error) {
+        curationSnapshot = null;
+        curationPreview = null;
+        renderCurationError('Unable to load curation snapshot.');
+        showAlert('Failed to load curation snapshot: ' + error.message, 'danger');
+    } finally {
+        curationPreviewLoading = false;
+        setCurationButtonsState();
+    }
+}
+
+async function refreshCurationSnapshot() {
+    if (curationPreviewLoading || curationRefreshLoading || curationApplyInFlight) {
+        return;
+    }
+
+    curationRefreshLoading = true;
+    setCurationButtonsState();
+    showSpinner(true);
+
+    try {
+        const snapshot = await app.api('/curation/refresh', {
+            method: 'POST',
+            body: { scope: 'fav_songs' },
+        });
+
+        curationSnapshot = snapshot;
+        curationPreview = snapshot;
+        curationSmokeTest = null;
+        renderCurationControlCenter(snapshot);
+        app.state.isOnline = true;
+        updateStatus();
+    } catch (error) {
+        curationSnapshot = null;
+        curationPreview = null;
+        renderCurationError('Unable to refresh curation snapshot.');
+        showAlert('Failed to refresh curation snapshot: ' + error.message, 'danger');
+    } finally {
+        curationRefreshLoading = false;
+        setCurationButtonsState();
+        showSpinner(false);
     }
 }
 
@@ -669,6 +749,155 @@ function renderCurationPreview(preview) {
     renderCurationChangePanel(changePanel, changes, skippedTracks, totalSkipped);
 }
 
+function groupedToMatrixRows(grouped) {
+    return Object.entries(grouped || {})
+        .map(([genre, temperMap]) => {
+            const counts = {};
+            CURATION_TEMPERS.forEach(temper => {
+                counts[temper] = asArray(temperMap && temperMap[temper]).length;
+            });
+            const total = Object.values(counts).reduce((sum, value) => sum + value, 0);
+            return { genre, counts, total, status: total > 0 ? 'ready' : 'empty' };
+        })
+        .sort((left, right) => right.total - left.total || left.genre.localeCompare(right.genre));
+}
+
+function renderCurationControlCenter(snapshot) {
+    const summary = DOM.curationSummary();
+    const reviewPanel = DOM.curationReviewPanel();
+    const changePanel = DOM.curationChangePanel();
+
+    if (!summary || !reviewPanel || !changePanel) {
+        return;
+    }
+
+    const grouped = snapshot && snapshot.grouped;
+    const rows = groupedToMatrixRows(grouped);
+    const changes = asArray(snapshot && snapshot.changes);
+    const skippedTracks = asArray(snapshot && snapshot.skipped_tracks);
+    const totalAssignments = asNumber(
+        snapshot && snapshot.total_assignments !== undefined
+            ? snapshot.total_assignments
+            : rows.reduce((sum, row) => sum + row.total, 0)
+    );
+    const totalGenres = asNumber(
+        snapshot && snapshot.total_genres !== undefined
+            ? snapshot.total_genres
+            : rows.length
+    );
+    const totalChanges = asNumber(
+        snapshot && snapshot.total_changes !== undefined
+            ? snapshot.total_changes
+            : changes.length
+    );
+    const totalSkipped = asNumber(
+        snapshot && snapshot.total_skipped !== undefined
+            ? snapshot.total_skipped
+            : skippedTracks.length
+    );
+
+    renderCurationSystemStatus(snapshot);
+    renderCurationSummary(summary, {
+        totalAssignments,
+        totalGenres,
+        totalChanges,
+        totalSkipped,
+    });
+    renderCurationMatrix(reviewPanel, grouped);
+    renderCurationWritePanel(changePanel, snapshot, changes, skippedTracks, totalSkipped);
+}
+
+function renderCurationSystemStatus(snapshot) {
+    const status = DOM.curationSystemStatus();
+    if (!status) {
+        return;
+    }
+
+    const snapshotStatus = !snapshot || !snapshot.available
+        ? 'Not loaded'
+        : snapshot.fresh
+            ? 'Fresh'
+            : 'Stale';
+    const createdAt = snapshot && snapshot.created_at
+        ? new Date(snapshot.created_at).toLocaleString()
+        : '';
+
+    status.replaceChildren();
+    [
+        ['SSD', 'Unknown'],
+        ['Music.app', 'Unknown'],
+        ['Snapshot', createdAt ? `${snapshotStatus} (${createdAt})` : snapshotStatus],
+    ].forEach(([label, value]) => {
+        const row = appendElement(status, 'div');
+        appendElement(row, 'span', null, label);
+        appendElement(row, 'strong', null, value);
+    });
+}
+
+function renderCurationMatrix(panel, grouped) {
+    if (!panel) {
+        return;
+    }
+
+    panel.replaceChildren();
+
+    const allRows = groupedToMatrixRows(grouped);
+    const genreFilter = DOM.curationGenreFilter();
+    const filterText = genreFilter ? genreFilter.value.trim().toLowerCase() : '';
+    const rows = filterText
+        ? allRows.filter(row => row.genre.toLowerCase().includes(filterText))
+        : allRows;
+
+    if (!allRows.length) {
+        const empty = appendElement(panel, 'div', 'card curation-empty-state');
+        appendElement(empty, 'h3', null, 'No Snapshot Data');
+        appendElement(empty, 'p', 'text-muted', 'Load or refresh a snapshot to review genre and temper counts.');
+        return;
+    }
+
+    if (!rows.length) {
+        const empty = appendElement(panel, 'div', 'card curation-empty-state');
+        appendElement(empty, 'h3', null, 'No Matching Genres');
+        appendElement(empty, 'p', 'text-muted', 'No snapshot genres match the current filter.');
+        return;
+    }
+
+    const matrix = appendElement(panel, 'div', 'curation-matrix');
+    const header = appendElement(matrix, 'div', 'curation-matrix-row curation-matrix-header');
+    ['Genre', ...CURATION_TEMPERS, 'Status'].forEach(label => {
+        appendElement(header, 'div', null, label);
+    });
+
+    rows.forEach(row => {
+        const rowEl = appendElement(matrix, 'div', 'curation-matrix-row');
+        appendElement(rowEl, 'div', null, row.genre);
+        CURATION_TEMPERS.forEach(temper => {
+            appendElement(rowEl, 'div', null, row.counts[temper]);
+        });
+        appendElement(rowEl, 'div', null, row.status);
+    });
+}
+
+function renderCurationWritePanel(panel, snapshot, changes, skippedTracks, totalSkipped) {
+    panel.replaceChildren();
+    appendElement(panel, 'h3', null, 'Write Safety');
+
+    if (!snapshot || !snapshot.available) {
+        appendElement(panel, 'p', 'text-muted', 'No snapshot is available. Load an existing snapshot or refresh from Music.app.');
+        return;
+    }
+
+    if (!snapshot.fresh) {
+        appendElement(panel, 'p', 'text-muted', 'Snapshot is stale. Refresh before smoke testing or applying changes.');
+    } else if (!(curationSmokeTest && curationSmokeTest.success)) {
+        appendElement(panel, 'p', 'text-muted', 'Run the mini-test before full apply is enabled.');
+    } else {
+        appendElement(panel, 'p', 'text-muted', 'Mini-test passed. Full apply is available.');
+    }
+
+    renderCurationChangePanel(panel, changes, skippedTracks, totalSkipped, true);
+}
+
 function renderCurationSummary(summary, counts) {
     summary.replaceChildren();
 
@@ -752,8 +981,10 @@ function renderCurationReviewPanel(panel, groups) {
     });
 }
 
-function renderCurationChangePanel(panel, changes, skippedTracks, totalSkipped) {
-    panel.replaceChildren();
+function renderCurationChangePanel(panel, changes, skippedTracks, totalSkipped, preserveExisting = false) {
+    if (!preserveExisting) {
+        panel.replaceChildren();
+    }
     appendElement(panel, 'h3', null, 'Dry-run Changes');
 
     if (!changes.length) {
@@ -804,10 +1035,11 @@ function renderCurationError(message) {
     const reviewPanel = DOM.curationReviewPanel();
     const changePanel = DOM.curationChangePanel();
 
-    if (!summary || !tree || !reviewPanel || !changePanel) {
+    if (!summary || !reviewPanel || !changePanel) {
         return;
     }
 
+    renderCurationSystemStatus(null);
     renderCurationSummary(summary, {
         totalAssignments: 0,
         totalGenres: 0,
@@ -815,22 +1047,24 @@ function renderCurationError(message) {
         totalSkipped: 0,
     });
 
-    tree.replaceChildren();
-    appendElement(tree, 'h3', null, 'Genres');
-    appendElement(tree, 'p', 'text-muted', 'No preview loaded.');
+    if (tree) {
+        tree.replaceChildren();
+        appendElement(tree, 'h3', null, 'Genres');
+        appendElement(tree, 'p', 'text-muted', 'No preview loaded.');
+    }
 
     reviewPanel.replaceChildren();
     const empty = appendElement(reviewPanel, 'div', 'card curation-empty-state');
-    appendElement(empty, 'h3', null, 'Preview Unavailable');
+    appendElement(empty, 'h3', null, 'Snapshot Unavailable');
     appendElement(empty, 'p', 'text-muted', message);
 
     changePanel.replaceChildren();
-    appendElement(changePanel, 'h3', null, 'Dry-run Changes');
+    appendElement(changePanel, 'h3', null, 'Write Safety');
     appendElement(changePanel, 'p', 'text-muted', 'No changes loaded.');
 }
 
 async function applyFavSongsCuration() {
-    if (curationApplyInFlight || curationPreviewLoading) {
+    if (curationApplyInFlight || curationPreviewLoading || curationRefreshLoading) {
         return;
     }
 
@@ -863,7 +1097,7 @@ async function applyFavSongsCuration() {
         showAlert(`Applied ${applied} curation change${applied === 1 ? '' : 's'}${failed ? `, ${failed} failed` : ''}.`, 'success');
         curationApplyInFlight = false;
         setCurationButtonsState();
-        await loadCurationPreview();
+        await loadCurationSnapshot();
     } catch (error) {
         showAlert('Failed to apply curation: ' + error.message, 'danger');
     } finally {
@@ -888,7 +1122,7 @@ function setupEventListeners() {
             // Load view-specific data
             if (view === 'playlists') loadPlaylists();
             if (view === 'dashboard') loadDashboard();
-            if (view === 'curation') loadCurationPreview();
+            if (view === 'curation') loadCurationSnapshot();
         });
     });
 
@@ -924,11 +1158,19 @@ function setupEventListeners() {
     });
 
     // Curation
+    if (DOM.curationLoadSnapshotBtn()) {
+        DOM.curationLoadSnapshotBtn().addEventListener('click', loadCurationSnapshot);
+    }
     if (DOM.curationRefreshBtn()) {
-        DOM.curationRefreshBtn().addEventListener('click', loadCurationPreview);
+        DOM.curationRefreshBtn().addEventListener('click', refreshCurationSnapshot);
     }
     if (DOM.curationDryRunBtn()) {
         DOM.curationDryRunBtn().addEventListener('click', loadCurationPreview);
+    }
+    if (DOM.curationGenreFilter()) {
+        DOM.curationGenreFilter().addEventListener('input', () => {
+            renderCurationMatrix(DOM.curationReviewPanel(), curationSnapshot && curationSnapshot.grouped);
+        });
     }
     if (DOM.curationApplyBtn()) {
         DOM.curationApplyBtn().addEventListener('click', applyFavSongsCuration);
@@ -960,7 +1202,7 @@ async function init() {
         const lastView = localStorage.getItem('affective_view') || 'dashboard';
         showView(lastView);
         if (lastView === 'curation') {
-            loadCurationPreview();
+            loadCurationSnapshot();
         }
     } catch (error) {
         showAlert('Failed to initialize application: ' + error.message, 'danger');
