@@ -31,7 +31,7 @@ from src.realtime import get_realtime_manager, simulate_sse_stream
 
 # Try to import Celery tasks
 try:
-    from src.tasks import analyze_mood, enrich_metadata
+    from src.tasks import analyze_mood, apply_curation, enrich_metadata
 
     CELERY_AVAILABLE = True
 except ImportError:
@@ -667,17 +667,45 @@ def curation_apply():
                 400,
             )
 
+        if not CELERY_AVAILABLE:
+            return jsonify({"error": "Curation apply queue unavailable"}), 503
+
+        job_id = f"curation-apply-{int(time.time())}-{uuid.uuid4().hex[:8]}"
+        job_store = get_job_store()
+        job_store.create_job(
+            job_id=job_id,
+            job_type="curation_apply",
+            payload={
+                "scope": scope,
+                "snapshot_created_at": snapshot_created_at,
+            },
+            user_agent=request.headers.get("User-Agent"),
+            client_ip=request.remote_addr,
+        )
+
+        try:
+            apply_curation.apply_async(
+                args=[job_id, scope],
+                task_id=job_id,
+            )
+        except Exception as queue_error:
+            job_store.update_job_status(
+                job_id,
+                "failed",
+                error_message=str(queue_error),
+                error_code="CURATION_QUEUE_ERROR",
+            )
+            return jsonify({"error": "Curation apply queue unavailable"}), 503
+
+        token_record["used"] = True
         return jsonify(
             {
-                "success": False,
-                "status": "locked",
-                "error": "Full apply is locked in this phase",
-                "message": (
-                    "Mini-test passed, but full Apple Music writes are still "
-                    "locked until the background apply workflow is enabled."
-                ),
+                "success": True,
+                "status": "queued",
+                "job_id": job_id,
+                "message": "Curation apply queued.",
             }
-        ), 501
+        ), 202
     except Exception as e:
         logger.error(f"Failed to apply curation: {e}")
         return jsonify({"error": str(e)}), 500

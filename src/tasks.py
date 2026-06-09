@@ -8,10 +8,61 @@ import time
 from typing import Any, Dict, List, Optional
 
 from src.celery_app import app
+from src.curation_service import CurationService
 from src.job_store import get_job_store
 from src.logger import setup_logger
 
 logger = setup_logger(__name__)
+
+
+@app.task(
+    bind=True,
+    name="affective_playlists.tasks.curation:apply_curation",
+    base=app.Task,
+)
+def apply_curation(
+    self,
+    job_id: str,
+    scope: str = "fav_songs",
+) -> Dict[str, Any]:
+    """Apply playlist curation changes through a persisted background job."""
+    job_store = get_job_store()
+    try:
+        job = job_store.get_job(job_id)
+        if not job:
+            raise ValueError(f"Job not found: {job_id}")
+        if scope != "fav_songs":
+            raise ValueError(f"Unsupported curation scope: {scope}")
+
+        job_store.update_job_status(job_id, "running")
+
+        result = CurationService().apply_fav_songs(confirmed=True)
+        job_store.store_result(
+            job_id,
+            result,
+            result_metadata={"format": "curation_apply", "version": 1},
+        )
+
+        if result.get("success") is True:
+            job_store.update_job_status(job_id, "completed")
+        else:
+            job_store.update_job_status(
+                job_id,
+                "failed",
+                error_message=str(result.get("error") or "Curation apply failed"),
+                error_code="CURATION_APPLY_FAILED",
+            )
+
+        return result
+    except Exception as e:
+        logger.error(f"Curation apply job {job_id} failed: {e}")
+        job_store.update_job_status(
+            job_id,
+            "failed",
+            error_message=str(e),
+            error_code="CURATION_APPLY_ERROR",
+        )
+        raise
 
 
 @app.task(

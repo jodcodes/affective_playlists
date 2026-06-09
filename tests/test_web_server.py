@@ -657,10 +657,24 @@ class TestCurationEndpoints:
         assert response.status_code == 400
         assert response.get_json()["error"] == "Valid smoke-test token required"
 
-    def test_curation_apply_remains_locked_after_gate_without_consuming_token(
+    def test_curation_apply_queues_job_after_gate_and_consumes_token(
         self, client, monkeypatch
     ):
         import src.web_server as ws
+
+        class FakeApplyTask:
+            def __init__(self):
+                self.calls = []
+
+            def apply_async(self, args, task_id):
+                self.calls.append({"args": args, "task_id": task_id})
+
+        class FakeJobStore:
+            def __init__(self):
+                self.created = []
+
+            def create_job(self, **kwargs):
+                self.created.append(kwargs)
 
         service = self.SmokeTestService({"success": True})
         service.snapshot = {
@@ -676,6 +690,11 @@ class TestCurationEndpoints:
         service.apply_fav_songs = lambda confirmed: (_ for _ in ()).throw(
             AssertionError("full apply should not run synchronously")
         )
+        task = FakeApplyTask()
+        store = FakeJobStore()
+        monkeypatch.setattr(ws, "CELERY_AVAILABLE", True)
+        monkeypatch.setattr(ws, "apply_curation", task, raising=False)
+        monkeypatch.setattr(ws, "get_job_store", lambda: store)
         monkeypatch.setattr("src.web_server._get_curation_service", lambda: service)
 
         smoke_response = client.post(
@@ -693,16 +712,54 @@ class TestCurationEndpoints:
             },
         )
 
-        assert response.status_code == 501
+        assert response.status_code == 202
         payload = response.get_json()
-        assert payload["status"] == "locked"
-        assert payload["error"] == "Full apply is locked in this phase"
-        assert ws._curation_smoke_tokens[token]["used"] is False
+        assert payload["status"] == "queued"
+        assert payload["success"] is True
+        assert payload["job_id"].startswith("curation-apply-")
+        assert len(store.created) == 1
+        created = store.created[0]
+        assert created["job_id"] == payload["job_id"]
+        assert created["job_type"] == "curation_apply"
+        assert created["payload"] == {
+            "scope": "fav_songs",
+            "snapshot_created_at": "2026-06-09T10:00:00Z",
+        }
+        assert created["user_agent"].startswith("Werkzeug/")
+        assert created["client_ip"] == "127.0.0.1"
+        assert task.calls == [
+            {
+                "args": [payload["job_id"], "fav_songs"],
+                "task_id": payload["job_id"],
+            }
+        ]
+        assert ws._curation_smoke_tokens[token]["used"] is True
 
-    def test_curation_apply_locked_response_keeps_smoke_test_token_reusable(
+    def test_curation_apply_queue_failure_keeps_smoke_test_token_reusable(
         self, client, monkeypatch
     ):
         import src.web_server as ws
+
+        class FakeApplyTask:
+            def apply_async(self, args, task_id):
+                raise RuntimeError("queue offline")
+
+        class FakeJobStore:
+            def __init__(self):
+                self.status_updates = []
+
+            def create_job(self, **kwargs):
+                self.job_id = kwargs["job_id"]
+
+            def update_job_status(self, job_id, new_status, error_message=None, error_code=None):
+                self.status_updates.append(
+                    {
+                        "job_id": job_id,
+                        "status": new_status,
+                        "error_message": error_message,
+                        "error_code": error_code,
+                    }
+                )
 
         class FakeService:
             def get_fav_songs_snapshot(self):
@@ -718,6 +775,10 @@ class TestCurationEndpoints:
             def run_fav_songs_smoke_test(self):
                 return {"success": True}
 
+        store = FakeJobStore()
+        monkeypatch.setattr(ws, "CELERY_AVAILABLE", True)
+        monkeypatch.setattr(ws, "apply_curation", FakeApplyTask(), raising=False)
+        monkeypatch.setattr(ws, "get_job_store", lambda: store)
         monkeypatch.setattr("src.web_server._get_curation_service", lambda: FakeService())
         token = client.post(
             "/api/curation/smoke-test", json={"scope": "fav_songs"}
@@ -732,11 +793,13 @@ class TestCurationEndpoints:
         first = client.post("/api/curation/apply", json=body)
         second = client.post("/api/curation/apply", json=body)
 
-        assert first.status_code == 501
-        assert second.status_code == 501
-        assert first.get_json()["status"] == "locked"
-        assert second.get_json()["status"] == "locked"
+        assert first.status_code == 503
+        assert second.status_code == 503
+        assert first.get_json()["error"] == "Curation apply queue unavailable"
+        assert second.get_json()["error"] == "Curation apply queue unavailable"
         assert ws._curation_smoke_tokens[token]["used"] is False
+        assert store.status_updates[-1]["status"] == "failed"
+        assert store.status_updates[-1]["error_code"] == "CURATION_QUEUE_ERROR"
 
     def test_curation_apply_rejects_expired_smoke_test_token(self, client, monkeypatch):
         import src.web_server as ws

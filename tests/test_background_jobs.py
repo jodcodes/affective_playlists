@@ -162,6 +162,104 @@ class TestTaskExecution:
         # Should log: error_message, traceback, status='failed'
         assert True  # Placeholder
 
+    def test_apply_curation_task_stores_completed_result(self, monkeypatch):
+        """Curation apply task should run service and persist result."""
+        import src.tasks as tasks
+
+        class FakeJobStore:
+            def __init__(self):
+                self.statuses = []
+                self.results = []
+
+            def get_job(self, job_id):
+                return object()
+
+            def update_job_status(
+                self, job_id, new_status, error_message=None, error_code=None
+            ):
+                self.statuses.append(
+                    {
+                        "job_id": job_id,
+                        "status": new_status,
+                        "error_message": error_message,
+                        "error_code": error_code,
+                    }
+                )
+
+            def store_result(self, job_id, result_json, result_metadata=None):
+                self.results.append(
+                    {
+                        "job_id": job_id,
+                        "result_json": result_json,
+                        "result_metadata": result_metadata,
+                    }
+                )
+
+        class FakeService:
+            def apply_fav_songs(self, confirmed):
+                assert confirmed is True
+                return {"success": True, "applied": 4, "failed": 0}
+
+        store = FakeJobStore()
+        monkeypatch.setattr(tasks, "get_job_store", lambda: store)
+        monkeypatch.setattr(tasks, "CurationService", FakeService)
+
+        result = tasks.apply_curation("curation-apply-1", "fav_songs")
+
+        assert result == {"success": True, "applied": 4, "failed": 0}
+        assert [entry["status"] for entry in store.statuses] == [
+            "running",
+            "completed",
+        ]
+        assert store.results == [
+            {
+                "job_id": "curation-apply-1",
+                "result_json": result,
+                "result_metadata": {"format": "curation_apply", "version": 1},
+            }
+        ]
+
+    def test_apply_curation_task_marks_failed_on_service_error(self, monkeypatch):
+        """Curation apply task should persist failure details."""
+        import src.tasks as tasks
+
+        class FakeJobStore:
+            def __init__(self):
+                self.statuses = []
+
+            def get_job(self, job_id):
+                return object()
+
+            def update_job_status(
+                self, job_id, new_status, error_message=None, error_code=None
+            ):
+                self.statuses.append(
+                    {
+                        "job_id": job_id,
+                        "status": new_status,
+                        "error_message": error_message,
+                        "error_code": error_code,
+                    }
+                )
+
+        class FakeService:
+            def apply_fav_songs(self, confirmed):
+                raise RuntimeError("Music write failed")
+
+        store = FakeJobStore()
+        monkeypatch.setattr(tasks, "get_job_store", lambda: store)
+        monkeypatch.setattr(tasks, "CurationService", FakeService)
+
+        with pytest.raises(RuntimeError, match="Music write failed"):
+            tasks.apply_curation("curation-apply-1", "fav_songs")
+
+        assert store.statuses[-1] == {
+            "job_id": "curation-apply-1",
+            "status": "failed",
+            "error_message": "Music write failed",
+            "error_code": "CURATION_APPLY_ERROR",
+        }
+
     def test_task_timeout_after_3600_seconds(self):
         """Task exceeding 3600s timeout should be killed."""
         # Task running > 1 hour
