@@ -249,24 +249,25 @@ def test_run_curation_dry_run_previews_without_apply(monkeypatch, capsys):
     assert "--apply" in output
 
 
-def test_run_curation_apply_confirms_write(monkeypatch):
+def test_run_curation_apply_is_locked_without_service_apply(monkeypatch, capsys):
     import main
 
     calls = install_fake_curation_service(monkeypatch)
     monkeypatch.setattr(main, "IS_MACOS", True)
 
-    assert main.run_curation(SimpleNamespace(apply=True)) == 0
-    assert calls == {"constructed": 1, "preview": 0, "apply": [True]}
+    assert main.run_curation(SimpleNamespace(apply=True)) == 1
+    assert calls == {"constructed": 0, "preview": 0, "apply": []}
+
+    output = capsys.readouterr().out
+    assert "Full apply is locked" in output
+    assert "UI mini-test" in output
 
 
-def test_run_curation_apply_failure_returns_1(monkeypatch):
+def test_run_curation_apply_lock_does_not_mask_dry_run(monkeypatch):
     import main
 
-    calls = install_fake_curation_service(
-        monkeypatch,
-        apply_result={"success": False, "applied": 1, "failed": 1},
-    )
+    calls = install_fake_curation_service(monkeypatch)
     monkeypatch.setattr(main, "IS_MACOS", True)
 
-    assert main.run_curation(SimpleNamespace(apply=True)) == 1
-    assert calls == {"constructed": 1, "preview": 0, "apply": [True]}
+    assert main.run_curation(SimpleNamespace(apply=False)) == 0
+    assert calls == {"constructed": 1, "preview": 1, "apply": []}

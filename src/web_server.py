@@ -14,6 +14,7 @@ State management:
 """
 
 import os
+import secrets
 import sys
 import time
 import uuid
@@ -62,6 +63,9 @@ _enrichment_state: Dict[str, Any] = {
     "start_time": 0,
     "job_id": None,
 }
+
+_CURATION_SMOKE_TOKEN_TTL_SECONDS = 10 * 60
+_curation_smoke_tokens: Dict[str, Dict[str, Any]] = {}
 
 _temperament_state: Dict[str, Any] = {
     "running": False,
@@ -590,6 +594,26 @@ def curation_apply():
         if mini_test_passed is not True:
             return jsonify({"error": "mini_test_passed must be true"}), 400
 
+        smoke_test_token = data.get("smoke_test_token")
+        token_record = (
+            _curation_smoke_tokens.get(smoke_test_token)
+            if isinstance(smoke_test_token, str)
+            else None
+        )
+        if (
+            not token_record
+            or token_record.get("used")
+            or token_record.get("success") is not True
+            or token_record.get("scope") != scope
+        ):
+            return jsonify({"error": "Valid smoke-test token required"}), 400
+        if token_record.get("expires_at", 0) < time.time():
+            _curation_smoke_tokens.pop(smoke_test_token, None)
+            return (
+                jsonify({"error": "Smoke-test token expired; run a new smoke test"}),
+                400,
+            )
+
         service = _get_curation_service()
         if not service:
             return jsonify({"error": "Curation service unavailable"}), 503
@@ -597,7 +621,23 @@ def curation_apply():
         snapshot = service.get_fav_songs_snapshot()
         if not snapshot or not snapshot.get("available") or not snapshot.get("fresh"):
             return jsonify({"error": "Fresh curation snapshot required"}), 400
+        snapshot_created_at = snapshot.get("created_at")
+        if not snapshot_created_at:
+            return jsonify({"error": "Current curation snapshot required"}), 400
+        if snapshot_created_at != token_record.get("snapshot_created_at"):
+            return (
+                jsonify(
+                    {
+                        "error": (
+                            "Smoke-test token does not match current snapshot; "
+                            "run a new smoke test"
+                        )
+                    }
+                ),
+                400,
+            )
 
+        token_record["used"] = True
         job_id = f"curation-apply-{int(time.time())}-{uuid.uuid4().hex[:8]}"
         return jsonify(
             {
@@ -629,6 +669,25 @@ def curation_smoke_test():
             return jsonify({"error": "Curation service unavailable"}), 503
 
         result = service.run_fav_songs_smoke_test()
+        if not result.get("success"):
+            return jsonify(result), 500
+
+        snapshot = service.get_fav_songs_snapshot()
+        if not snapshot or not snapshot.get("available") or not snapshot.get("fresh"):
+            return jsonify({"error": "Fresh curation snapshot required"}), 400
+        snapshot_created_at = snapshot.get("created_at")
+        if not snapshot_created_at:
+            return jsonify({"error": "Current curation snapshot required"}), 400
+
+        token = secrets.token_urlsafe(18)
+        _curation_smoke_tokens[token] = {
+            "scope": scope,
+            "snapshot_created_at": snapshot_created_at,
+            "success": True,
+            "expires_at": time.time() + _CURATION_SMOKE_TOKEN_TTL_SECONDS,
+            "used": False,
+        }
+        result["smoke_test_token"] = token
         return jsonify(result), 200 if result.get("success") else 500
     except Exception as e:
         logger.error(f"Failed to run curation smoke test: {e}")

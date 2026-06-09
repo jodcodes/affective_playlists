@@ -428,10 +428,38 @@ def test_applescript_playlist_lookup_validates_full_root_genre_path():
         encoding="utf-8"
     )
 
-    assert "findUserPlaylistByFullPath(playlistName, genreName, rootName)" in script
+    assert "findUniqueUserPlaylistByFullPath(playlistName, genreName, rootName)" in script
     assert "name of parent of candidate is genreName" in script
     assert "name of parent of parent of candidate is rootName" in script
     assert "findUserPlaylistByNameAndParent(playlistName, genreName)" not in script
+
+
+def test_applescript_root_folder_lookup_fails_on_ambiguous_matches():
+    script = Path("src/scripts/curation_structure.applescript").read_text(
+        encoding="utf-8"
+    )
+
+    root_handler = script[
+        script.index("on ensureRootFolder(rootName)") : script.index(
+            "end ensureRootFolder"
+        )
+    ]
+    assert "if (count of matches) > 1 then" in root_handler
+    assert 'error "Ambiguous root folder' in root_handler
+    assert "return item 1 of matches" not in root_handler
+
+
+def test_applescript_nested_lookup_fails_on_ambiguous_path_matches():
+    script = Path("src/scripts/curation_structure.applescript").read_text(
+        encoding="utf-8"
+    )
+
+    assert "findUniqueFolderByNameAndParent" in script
+    assert "findUniqueUserPlaylistByFullPath" in script
+    assert 'error "Ambiguous folder path' in script
+    assert 'error "Ambiguous playlist path' in script
+    assert "findFolderByNameAndParent" not in script
+    assert "findUserPlaylistByFullPath" not in script
 
 
 def test_curation_structure_no_arg_guard_returns_fast_error():

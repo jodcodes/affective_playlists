@@ -572,6 +572,7 @@ function hasPassedSmokeTestForCurrentSnapshot() {
         hasFreshCurationSnapshot() &&
         curationSmokeTest &&
         curationSmokeTest.success &&
+        curationSmokeTest.smoke_test_token &&
         curationSmokeTest.snapshotCreatedAt === curationSnapshot.created_at
     );
 }
@@ -1160,6 +1161,7 @@ async function applyFavSongsCuration() {
                 scope: 'fav_songs',
                 confirmed: true,
                 mini_test_passed: hasPassedSmokeTestForCurrentSnapshot(),
+                smoke_test_token: curationSmokeTest.smoke_test_token,
             },
         });
 

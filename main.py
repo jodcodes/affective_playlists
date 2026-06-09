@@ -255,13 +255,18 @@ def run_curation(args=None):
     if not require_macos("Curation"):
         return 1
 
+    if args and getattr(args, "apply", False):
+        print(
+            error(
+                "Full apply is locked for the CLI in this phase. "
+                "Use the UI mini-test and queued workflow instead."
+            )
+        )
+        return 1
+
     from src.curation_service import CurationService
 
     service = CurationService()
-    if args and getattr(args, "apply", False):
-        result = service.apply_fav_songs(confirmed=True)
-        print(info(f"Applied: {result.get('applied', 0)} | Failed: {result.get('failed', 0)}"))
-        return 0 if result.get("success") else 1
 
     preview = service.preview_fav_songs()
     print(info("Preview only - no changes written. Re-run with --apply to write changes."))

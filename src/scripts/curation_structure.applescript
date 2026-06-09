@@ -74,28 +74,38 @@ end copyTrack
 on ensureRootFolder(rootName)
     tell application "Music"
         set matches to every folder playlist whose name is rootName
-        if (count of matches) > 0 then
-            return item 1 of matches
+        if (count of matches) > 1 then
+            error "Ambiguous root folder " & rootName & ": multiple folder playlists share this name"
+        end if
+        if (count of matches) is 1 then
+            repeat with candidate in matches
+                return contents of candidate
+            end repeat
         end if
         make new folder playlist with properties {name:rootName}
         set matches to every folder playlist whose name is rootName
         if (count of matches) is 0 then
             error "Could not create folder " & rootName
         end if
-        return item 1 of matches
+        if (count of matches) > 1 then
+            error "Ambiguous root folder " & rootName & ": multiple folder playlists share this name"
+        end if
+        repeat with candidate in matches
+            return contents of candidate
+        end repeat
     end tell
 end ensureRootFolder
 
 on ensureGenreFolder(rootName, genreName)
     tell application "Music"
         set rootFolder to my ensureRootFolder(rootName)
-        set genreFolder to my findFolderByNameAndParent(genreName, rootName)
+        set genreFolder to my findUniqueFolderByNameAndParent(genreName, rootName)
         if genreFolder is not missing value then
             return genreFolder
         end if
 
         make new folder playlist at rootFolder with properties {name:genreName}
-        set genreFolder to my findFolderByNameAndParent(genreName, rootName)
+        set genreFolder to my findUniqueFolderByNameAndParent(genreName, rootName)
         if genreFolder is missing value then
             error "Could not create folder " & rootName & " / " & genreName
         end if
@@ -106,13 +116,13 @@ end ensureGenreFolder
 on ensureTargetPlaylist(rootName, genreName, playlistName)
     tell application "Music"
         set genreFolder to my ensureGenreFolder(rootName, genreName)
-        set targetPlaylist to my findUserPlaylistByFullPath(playlistName, genreName, rootName)
+        set targetPlaylist to my findUniqueUserPlaylistByFullPath(playlistName, genreName, rootName)
         if targetPlaylist is not missing value then
             return targetPlaylist
         end if
 
         make new user playlist at genreFolder with properties {name:playlistName}
-        set targetPlaylist to my findUserPlaylistByFullPath(playlistName, genreName, rootName)
+        set targetPlaylist to my findUniqueUserPlaylistByFullPath(playlistName, genreName, rootName)
         if targetPlaylist is missing value then
             error "Could not create playlist " & playlistName
         end if
@@ -120,33 +130,51 @@ on ensureTargetPlaylist(rootName, genreName, playlistName)
     end tell
 end ensureTargetPlaylist
 
-on findFolderByNameAndParent(folderName, parentName)
+on findUniqueFolderByNameAndParent(folderName, parentName)
     tell application "Music"
         set matches to every folder playlist whose name is folderName
+        set foundFolder to missing value
+        set foundCount to 0
         repeat with candidate in matches
             try
                 if name of parent of candidate is parentName then
-                    return contents of candidate
+                    set foundFolder to contents of candidate
+                    set foundCount to foundCount + 1
                 end if
             end try
         end repeat
+        if foundCount > 1 then
+            error "Ambiguous folder path " & parentName & " / " & folderName
+        end if
+        if foundCount is 1 then
+            return foundFolder
+        end if
     end tell
     return missing value
-end findFolderByNameAndParent
+end findUniqueFolderByNameAndParent
 
-on findUserPlaylistByFullPath(playlistName, genreName, rootName)
+on findUniqueUserPlaylistByFullPath(playlistName, genreName, rootName)
     tell application "Music"
         set matches to every user playlist whose name is playlistName
+        set foundPlaylist to missing value
+        set foundCount to 0
         repeat with candidate in matches
             try
                 if name of parent of candidate is genreName and name of parent of parent of candidate is rootName then
-                    return contents of candidate
+                    set foundPlaylist to contents of candidate
+                    set foundCount to foundCount + 1
                 end if
             end try
         end repeat
+        if foundCount > 1 then
+            error "Ambiguous playlist path " & rootName & " / " & genreName & " / " & playlistName
+        end if
+        if foundCount is 1 then
+            return foundPlaylist
+        end if
     end tell
     return missing value
-end findUserPlaylistByFullPath
+end findUniqueUserPlaylistByFullPath
 
 on sourceTrackByPersistentID(trackPID)
     tell application "Music"
