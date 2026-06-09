@@ -534,6 +534,43 @@ def curation_preview():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/curation/snapshot", methods=["GET"])
+def curation_snapshot():
+    """Return cached playlist curation snapshot."""
+    try:
+        scope = request.args.get("scope", "fav_songs")
+        if scope != "fav_songs":
+            return jsonify({"error": "Unsupported curation scope"}), 400
+
+        service = _get_curation_service()
+        if not service:
+            return jsonify({"error": "Curation service unavailable"}), 503
+
+        return jsonify(service.get_fav_songs_snapshot())
+    except Exception as e:
+        logger.error(f"Failed to get curation snapshot: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/curation/refresh", methods=["POST"])
+def curation_refresh():
+    """Refresh and return playlist curation snapshot."""
+    try:
+        data = request.get_json(silent=True) or {}
+        scope = data.get("scope", "fav_songs")
+        if scope != "fav_songs":
+            return jsonify({"error": "Unsupported curation scope"}), 400
+
+        service = _get_curation_service()
+        if not service:
+            return jsonify({"error": "Curation service unavailable"}), 503
+
+        return jsonify(service.refresh_fav_songs_snapshot())
+    except Exception as e:
+        logger.error(f"Failed to refresh curation snapshot: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/curation/apply", methods=["POST"])
 def curation_apply():
     """Apply playlist curation changes after confirmation."""

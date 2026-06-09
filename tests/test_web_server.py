@@ -529,6 +529,73 @@ class TestCurationEndpoints:
         assert response.status_code == 200
         assert response.get_json()["total_assignments"] == 0
 
+    def test_curation_snapshot_returns_cached_state(self, client, monkeypatch):
+        class FakeService:
+            def get_fav_songs_snapshot(self):
+                return {
+                    "scope": "fav_songs",
+                    "available": True,
+                    "fresh": True,
+                    "total_assignments": 2,
+                    "total_genres": 1,
+                    "total_changes": 4,
+                    "total_skipped": 0,
+                    "grouped": {"Hip Hop": {"Frolic": []}},
+                }
+
+            def preview_fav_songs(self):
+                raise AssertionError("snapshot should not preview Music.app")
+
+        monkeypatch.setattr("src.web_server._get_curation_service", lambda: FakeService())
+
+        response = client.get("/api/curation/snapshot?scope=fav_songs")
+
+        assert response.status_code == 200
+        assert response.get_json()["total_assignments"] == 2
+
+    def test_curation_refresh_updates_snapshot(self, client, monkeypatch):
+        class FakeService:
+            def refresh_fav_songs_snapshot(self):
+                return {
+                    "scope": "fav_songs",
+                    "available": True,
+                    "fresh": True,
+                    "total_assignments": 4106,
+                    "total_genres": 139,
+                    "total_changes": 4430,
+                    "total_skipped": 0,
+                    "grouped": {},
+                }
+
+        monkeypatch.setattr("src.web_server._get_curation_service", lambda: FakeService())
+
+        response = client.post("/api/curation/refresh", json={"scope": "fav_songs"})
+
+        assert response.status_code == 200
+        assert response.get_json()["total_genres"] == 139
+
+    def test_curation_snapshot_rejects_unsupported_scope(self, client):
+        response = client.get("/api/curation/snapshot?scope=albums")
+
+        assert response.status_code == 400
+        assert response.get_json()["error"] == "Unsupported curation scope"
+
+    def test_curation_refresh_rejects_unsupported_scope(self, client):
+        response = client.post("/api/curation/refresh", json={"scope": "albums"})
+
+        assert response.status_code == 400
+        assert response.get_json()["error"] == "Unsupported curation scope"
+
+    def test_curation_snapshot_returns_503_when_service_unavailable(
+        self, client, monkeypatch
+    ):
+        monkeypatch.setattr("src.web_server._get_curation_service", lambda: None)
+
+        response = client.get("/api/curation/snapshot")
+
+        assert response.status_code == 503
+        assert response.get_json()["error"] == "Curation service unavailable"
+
     def test_curation_apply_missing_confirmation_passes_false(
         self, client, monkeypatch
     ):
