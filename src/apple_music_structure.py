@@ -135,7 +135,7 @@ class AppleMusicStructureApplier:
                         "stderr": _strip_process_output(exc.stderr) or str(exc),
                     }
                 )
-                continue
+                break
             except OSError as exc:
                 failed += 1
                 errors.append(
@@ -145,7 +145,7 @@ class AppleMusicStructureApplier:
                         "stderr": str(exc),
                     }
                 )
-                continue
+                break
 
             if result.returncode == 0 and "SUCCESS" in stdout:
                 applied += 1
@@ -159,6 +159,7 @@ class AppleMusicStructureApplier:
                     "stderr": stderr,
                 }
             )
+            break
 
         return {
             "success": failed == 0,

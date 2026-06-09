@@ -921,7 +921,7 @@ function renderCurationWritePanel(snapshot, smokeTest = curationSmokeTest) {
     if (!smokeTest) {
         appendElement(panel, 'p', 'text-muted', 'Mini-test: not run. Full apply is locked.');
     } else if (smokeTest.success && hasPassedSmokeTestForCurrentSnapshot()) {
-        appendElement(panel, 'p', 'status-success', 'Mini-test: passed. Full apply is available.');
+        appendElement(panel, 'p', 'status-success', 'Mini-test: passed. Full apply remains locked.');
     } else if (smokeTest.success) {
         appendElement(panel, 'p', 'text-muted', 'Mini-test: not run for the current snapshot. Full apply is locked.');
     } else {
@@ -1143,7 +1143,7 @@ async function applyFavSongsCuration() {
     }
 
     const confirmed = window.confirm(
-        'Apply Favourite Songs curation in Apple Music? This can create folders, playlists, and copy tracks.'
+        'Full apply is still locked in this phase. Check the server gate now?'
     );
 
     if (!confirmed) {
@@ -1165,7 +1165,7 @@ async function applyFavSongsCuration() {
             },
         });
 
-        showAlert(`Curation apply queued: ${result.job_id}`, 'success');
+        showAlert(result.message || 'Curation apply request accepted.', 'success');
         curationApplyInFlight = false;
         setCurationButtonsState();
         await loadCurationSnapshot();

@@ -667,19 +667,17 @@ def curation_apply():
                 400,
             )
 
-        token_record["used"] = True
-        job_id = f"curation-apply-{int(time.time())}-{uuid.uuid4().hex[:8]}"
         return jsonify(
             {
-                "success": True,
-                "status": "queued",
-                "job_id": job_id,
+                "success": False,
+                "status": "locked",
+                "error": "Full apply is locked in this phase",
                 "message": (
-                    "Curation apply queued. Background execution will be wired "
-                    "in the next phase."
+                    "Mini-test passed, but full Apple Music writes are still "
+                    "locked until the background apply workflow is enabled."
                 ),
             }
-        ), 202
+        ), 501
     except Exception as e:
         logger.error(f"Failed to apply curation: {e}")
         return jsonify({"error": str(e)}), 500
@@ -698,16 +696,16 @@ def curation_smoke_test():
         if not service:
             return jsonify({"error": "Curation service unavailable"}), 503
 
-        result = service.run_fav_songs_smoke_test()
-        if not result.get("success"):
-            return jsonify(result), 500
-
         snapshot = service.get_fav_songs_snapshot()
         if not snapshot or not snapshot.get("available") or not snapshot.get("fresh"):
             return jsonify({"error": "Fresh curation snapshot required"}), 400
         snapshot_created_at = snapshot.get("created_at")
         if not snapshot_created_at:
             return jsonify({"error": "Current curation snapshot required"}), 400
+
+        result = service.run_fav_songs_smoke_test()
+        if not result.get("success"):
+            return jsonify(result), 500
 
         token = secrets.token_urlsafe(18)
         _curation_smoke_tokens[token] = {

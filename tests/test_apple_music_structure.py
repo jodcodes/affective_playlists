@@ -196,6 +196,45 @@ def test_applier_records_subprocess_failures(tmp_path):
     ]
 
 
+def test_applier_stops_after_first_failed_write(tmp_path):
+    script_path = tmp_path / "curation_structure.js"
+    script_path.write_text("// test script", encoding="utf-8")
+    applier = AppleMusicStructureApplier(script_path=str(script_path))
+    folder_change = AppleMusicChange(
+        "ensure_folder", ["Fav Songs"], "Ensure folder Fav Songs"
+    )
+    copy_change = AppleMusicChange(
+        "copy_track",
+        ["track-1", "Fav Songs", "Hiphop", "Fav Hiphop Frolic"],
+        "Copy track",
+    )
+
+    with patch("src.apple_music_structure.subprocess.run") as run:
+        run.side_effect = [
+            SimpleNamespace(
+                returncode=1,
+                stdout="partial output\n",
+                stderr="failed to create folder\n",
+            ),
+            SimpleNamespace(returncode=0, stdout="SUCCESS\n", stderr=""),
+        ]
+        result = applier.apply_changes(
+            [folder_change, copy_change], confirmed=True
+        )
+
+    assert run.call_count == 1
+    assert result["success"] is False
+    assert result["applied"] == 0
+    assert result["failed"] == 1
+    assert result["errors"] == [
+        {
+            "change": folder_change.to_dict(),
+            "stdout": "partial output",
+            "stderr": "failed to create folder",
+        }
+    ]
+
+
 def test_applier_records_timeout_failures(tmp_path):
     script_path = tmp_path / "curation_structure.js"
     script_path.write_text("// test script", encoding="utf-8")

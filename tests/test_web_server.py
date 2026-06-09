@@ -657,7 +657,11 @@ class TestCurationEndpoints:
         assert response.status_code == 400
         assert response.get_json()["error"] == "Valid smoke-test token required"
 
-    def test_curation_apply_accepts_job_request_after_gate(self, client, monkeypatch):
+    def test_curation_apply_remains_locked_after_gate_without_consuming_token(
+        self, client, monkeypatch
+    ):
+        import src.web_server as ws
+
         service = self.SmokeTestService({"success": True})
         service.snapshot = {
             "available": True,
@@ -689,12 +693,17 @@ class TestCurationEndpoints:
             },
         )
 
-        assert response.status_code == 202
+        assert response.status_code == 501
         payload = response.get_json()
-        assert payload["status"] == "queued"
-        assert payload["job_id"].startswith("curation-apply-")
+        assert payload["status"] == "locked"
+        assert payload["error"] == "Full apply is locked in this phase"
+        assert ws._curation_smoke_tokens[token]["used"] is False
 
-    def test_curation_apply_rejects_reused_smoke_test_token(self, client, monkeypatch):
+    def test_curation_apply_locked_response_keeps_smoke_test_token_reusable(
+        self, client, monkeypatch
+    ):
+        import src.web_server as ws
+
         class FakeService:
             def get_fav_songs_snapshot(self):
                 return {
@@ -723,9 +732,11 @@ class TestCurationEndpoints:
         first = client.post("/api/curation/apply", json=body)
         second = client.post("/api/curation/apply", json=body)
 
-        assert first.status_code == 202
-        assert second.status_code == 400
-        assert second.get_json()["error"] == "Valid smoke-test token required"
+        assert first.status_code == 501
+        assert second.status_code == 501
+        assert first.get_json()["status"] == "locked"
+        assert second.get_json()["status"] == "locked"
+        assert ws._curation_smoke_tokens[token]["used"] is False
 
     def test_curation_apply_rejects_expired_smoke_test_token(self, client, monkeypatch):
         import src.web_server as ws
@@ -957,6 +968,23 @@ class TestCurationEndpoints:
         assert payload["smoke_test_token"]
         assert service.calls == 1
 
+    def test_curation_smoke_test_requires_fresh_snapshot_before_writing(
+        self, client, monkeypatch
+    ):
+        service = self.SmokeTestService({"success": True})
+        service.get_fav_songs_snapshot = lambda: {
+            "available": True,
+            "fresh": False,
+            "created_at": "2026-06-09T10:00:00Z",
+        }
+        monkeypatch.setattr("src.web_server._get_curation_service", lambda: service)
+
+        response = client.post("/api/curation/smoke-test", json={"scope": "fav_songs"})
+
+        assert response.status_code == 400
+        assert response.get_json()["error"] == "Fresh curation snapshot required"
+        assert service.calls == 0
+
     def test_curation_smoke_test_rejects_unsupported_scope(self, client, monkeypatch):
         monkeypatch.setattr("src.web_server._get_curation_service", lambda: None)
 
@@ -979,6 +1007,11 @@ class TestCurationEndpoints:
         self, client, monkeypatch
     ):
         service = self.SmokeTestService({"success": False, "error": "Smoke failed"})
+        service.get_fav_songs_snapshot = lambda: {
+            "available": True,
+            "fresh": True,
+            "created_at": "2026-06-09T10:00:00Z",
+        }
         monkeypatch.setattr("src.web_server._get_curation_service", lambda: service)
 
         response = client.post("/api/curation/smoke-test", json={"scope": "fav_songs"})
