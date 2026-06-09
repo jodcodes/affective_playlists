@@ -45,7 +45,7 @@ class CurationSnapshotStore:
         try:
             with self.path.open("r", encoding="utf-8") as handle:
                 data = json.load(handle)
-        except (OSError, json.JSONDecodeError):
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
             return {}
 
         if not isinstance(data, dict):

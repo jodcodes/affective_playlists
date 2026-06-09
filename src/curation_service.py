@@ -121,8 +121,16 @@ class CurationService:
             "scope": "fav_songs",
             "total_assignments": int(preview.get("total_assignments") or 0),
             "total_genres": len(grouped),
-            "total_changes": int(preview.get("total_changes") or len(changes)),
-            "total_skipped": int(preview.get("total_skipped") or len(skipped_tracks)),
+            "total_changes": int(
+                preview["total_changes"]
+                if "total_changes" in preview
+                else len(changes)
+            ),
+            "total_skipped": int(
+                preview["total_skipped"]
+                if "total_skipped" in preview
+                else len(skipped_tracks)
+            ),
             "grouped": grouped,
             "changes": changes,
             "skipped_tracks": skipped_tracks,

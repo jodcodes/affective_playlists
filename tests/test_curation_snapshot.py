@@ -62,6 +62,26 @@ def test_snapshot_store_returns_empty_state_when_malformed(tmp_path):
     assert loaded["skipped_tracks"] == []
 
 
+def test_snapshot_store_returns_empty_state_when_file_has_invalid_utf8(tmp_path):
+    path = tmp_path / "curation_snapshots.json"
+    path.write_bytes(b"\xff\xfe\x00")
+    store = CurationSnapshotStore(path)
+
+    loaded = store.load_snapshot("fav_songs")
+
+    assert loaded["scope"] == "fav_songs"
+    assert loaded["available"] is False
+    assert loaded["fresh"] is False
+    assert loaded["created_at"] is None
+    assert loaded["total_assignments"] == 0
+    assert loaded["total_genres"] == 0
+    assert loaded["total_changes"] == 0
+    assert loaded["total_skipped"] == 0
+    assert loaded["grouped"] == {}
+    assert loaded["changes"] == []
+    assert loaded["skipped_tracks"] == []
+
+
 class FakeSnapshotStore:
     def __init__(self):
         self.saved = []
