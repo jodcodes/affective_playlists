@@ -269,7 +269,12 @@ def run_curation(args=None):
     service = CurationService()
 
     preview = service.preview_fav_songs()
-    print(info("Preview only - no changes written. Re-run with --apply to write changes."))
+    print(
+        info(
+            "Preview only - no changes written. "
+            "Use the UI mini-test and queued workflow to apply changes."
+        )
+    )
     print(info(f"Favourite tracks: {preview['total_assignments']}"))
     print(info(f"Planned changes: {preview['total_changes']}"))
     if preview.get("total_skipped"):

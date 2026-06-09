@@ -246,7 +246,7 @@ def test_run_curation_dry_run_previews_without_apply(monkeypatch, capsys):
 
     output = capsys.readouterr().out
     assert "Preview" in output
-    assert "--apply" in output
+    assert "UI mini-test" in output
 
 
 def test_run_curation_apply_is_locked_without_service_apply(monkeypatch, capsys):
