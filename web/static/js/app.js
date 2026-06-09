@@ -61,6 +61,9 @@ let curationApplyInFlight = false;
 let curationSnapshot = null;
 let curationSmokeTest = null;
 let curationRefreshLoading = false;
+let curationApplyJob = null;
+let curationApplyPollTimer = null;
+const CURATION_SMALL_APPLY_TRACK_LIMIT = 1;
 
 // ============================================================================
 // DOM Elements
@@ -845,6 +848,31 @@ function renderCurationSystemStatus(snapshot) {
     });
 }
 
+function renderCurationApplyJobStatus(panel) {
+    if (!panel || !curationApplyJob) {
+        return;
+    }
+
+    const status = textValue(curationApplyJob.status, 'queued');
+    const progress = asNumber(curationApplyJob.progress, 0);
+    const currentTrack = asNumber(curationApplyJob.current_track, 0);
+    const totalTracks = asNumber(curationApplyJob.total_tracks, 0);
+    const errorMessage = textValue(curationApplyJob.error_message);
+    const isFailed = status === 'failed';
+    const isCompleted = status === 'completed';
+    const statusClass = isFailed ? 'status-danger' : isCompleted ? 'status-success' : 'text-muted';
+
+    appendElement(panel, 'h3', null, 'Apply Job');
+    appendElement(panel, 'p', statusClass, `Status: ${status}${progress ? ` (${progress}%)` : ''}`);
+    if (currentTrack || totalTracks) {
+        appendElement(panel, 'p', 'text-muted', `Tracks: ${currentTrack}/${totalTracks}`);
+    }
+    appendElement(panel, 'p', 'text-muted', `Job: ${textValue(curationApplyJob.id, 'pending')}`);
+    if (errorMessage) {
+        appendElement(panel, 'p', 'status-danger', errorMessage);
+    }
+}
+
 function renderCurationMatrix(panel, grouped) {
     if (!panel) {
         return;
@@ -919,16 +947,17 @@ function renderCurationWritePanel(snapshot, smokeTest = curationSmokeTest) {
     }
 
     if (!smokeTest) {
-        appendElement(panel, 'p', 'text-muted', 'Mini-test: not run. Full apply is locked.');
+        appendElement(panel, 'p', 'text-muted', 'Mini-test: not run. Apply is locked.');
     } else if (smokeTest.success && hasPassedSmokeTestForCurrentSnapshot()) {
-        appendElement(panel, 'p', 'status-success', 'Mini-test: passed. Full apply can be queued.');
+        appendElement(panel, 'p', 'status-success', 'Mini-test: passed. 1-track apply can be queued.');
     } else if (smokeTest.success) {
-        appendElement(panel, 'p', 'text-muted', 'Mini-test: not run for the current snapshot. Full apply is locked.');
+        appendElement(panel, 'p', 'text-muted', 'Mini-test: not run for the current snapshot. Apply is locked.');
     } else {
         const error = textValue(smokeTest.error, 'Unknown error');
         appendElement(panel, 'p', 'status-danger', `Mini-test: failed. ${error}`);
     }
 
+    renderCurationApplyJobStatus(panel);
     renderCurationChangePanel(panel, changes, skippedTracks, totalSkipped, true);
 }
 
@@ -1125,6 +1154,48 @@ async function runCurationSmokeTest() {
     }
 }
 
+function clearCurationApplyPollTimer() {
+    if (curationApplyPollTimer) {
+        clearTimeout(curationApplyPollTimer);
+        curationApplyPollTimer = null;
+    }
+}
+
+function isTerminalCurationJobStatus(status) {
+    return ['completed', 'failed', 'cancelled', 'timeout'].includes(status);
+}
+
+async function pollCurationApplyJob(jobId) {
+    clearCurationApplyPollTimer();
+
+    try {
+        const job = await app.api(`/jobs/${encodeURIComponent(jobId)}`);
+        curationApplyJob = job;
+        renderCurationWritePanel(curationSnapshot, curationSmokeTest);
+
+        if (isTerminalCurationJobStatus(job.status)) {
+            curationApplyInFlight = false;
+            setCurationButtonsState();
+            if (job.status === 'completed') {
+                showAlert('1-track apply completed.', 'success');
+                await loadCurationSnapshot();
+            } else {
+                showAlert(`Apply job ${job.status}: ${textValue(job.error_message, job.id)}`, 'danger');
+            }
+            return;
+        }
+
+        curationApplyPollTimer = setTimeout(
+            () => pollCurationApplyJob(jobId),
+            app.config.pollInterval
+        );
+    } catch (error) {
+        curationApplyInFlight = false;
+        setCurationButtonsState();
+        showAlert('Failed to poll apply job: ' + error.message, 'danger');
+    }
+}
+
 async function applyFavSongsCuration() {
     if (curationApplyInFlight || curationPreviewLoading || curationRefreshLoading) {
         return;
@@ -1132,7 +1203,7 @@ async function applyFavSongsCuration() {
 
     if (!hasPassedSmokeTestForCurrentSnapshot()) {
         setCurationButtonsState();
-        showAlert('Run a successful mini-test against the current fresh snapshot before full apply.', 'warning');
+        showAlert('Run a successful mini-test against the current fresh snapshot before apply.', 'warning');
         return;
     }
 
@@ -1143,7 +1214,7 @@ async function applyFavSongsCuration() {
     }
 
     const confirmed = window.confirm(
-        'Queue full Favourite Songs curation in Apple Music? This can create folders, playlists, and copy tracks.'
+        `Queue a ${CURATION_SMALL_APPLY_TRACK_LIMIT}-track Favourite Songs apply test in Apple Music? This can create folders, playlists, and copy one track.`
     );
 
     if (!confirmed) {
@@ -1162,17 +1233,24 @@ async function applyFavSongsCuration() {
                 confirmed: true,
                 mini_test_passed: hasPassedSmokeTestForCurrentSnapshot(),
                 smoke_test_token: curationSmokeTest.smoke_test_token,
+                max_tracks: CURATION_SMALL_APPLY_TRACK_LIMIT,
             },
         });
 
-        showAlert(`Curation apply queued: ${result.job_id}`, 'success');
-        curationApplyInFlight = false;
+        curationApplyJob = {
+            id: result.job_id,
+            status: result.status || 'queued',
+            progress: 0,
+        };
+        renderCurationWritePanel(curationSnapshot, curationSmokeTest);
+        showAlert(`1-track apply queued: ${result.job_id}`, 'success');
         setCurationButtonsState();
-        await loadCurationSnapshot();
+        pollCurationApplyJob(result.job_id);
     } catch (error) {
+        clearCurationApplyPollTimer();
+        curationApplyInFlight = false;
         showAlert('Failed to apply curation: ' + error.message, 'danger');
     } finally {
-        curationApplyInFlight = false;
         setCurationButtonsState();
         showSpinner(false);
     }

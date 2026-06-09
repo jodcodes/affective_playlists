@@ -173,13 +173,33 @@ class CurationService:
             grouped[genre].setdefault(temperament, []).append(assignment)
         return grouped
 
-    def apply_fav_songs(self, confirmed: bool) -> Dict[str, Any]:
+    def apply_fav_songs(
+        self, confirmed: bool, max_tracks: Optional[int] = None
+    ) -> Dict[str, Any]:
+        if max_tracks is not None and max_tracks < 1:
+            raise ValueError("max_tracks must be a positive integer")
+
         preview = self.preview_fav_songs()
+        assignment_dicts = list(preview["assignments"])
+        if max_tracks is not None:
+            assignment_dicts = assignment_dicts[:max_tracks]
+
         assignments = [
             CurationAssignment.from_dict(assignment)
-            for assignment in preview["assignments"]
+            for assignment in assignment_dicts
         ]
         changes = self.planner.plan_fav_tracks(assignments)
+        preview = {
+            **preview,
+            "assignments": assignment_dicts,
+            "grouped": self._group_assignments(assignment_dicts),
+            "changes": [change.to_dict() for change in changes],
+            "total_assignments": len(assignments),
+            "total_changes": len(changes),
+        }
+        if max_tracks is not None:
+            preview["max_tracks"] = max_tracks
+
         result = self.applier.apply_changes(changes, confirmed=confirmed)
         result["preview"] = preview
         return result

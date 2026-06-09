@@ -221,6 +221,25 @@ def test_apply_fav_songs_delegates_to_applier_and_attaches_preview():
     assert result["preview"]["total_changes"] == len(changes)
 
 
+def test_apply_fav_songs_can_limit_tracks_for_small_apply():
+    applier = FakeApplier()
+    service = CurationService(
+        apple_music=FakeAppleMusic(),
+        temper_classifier=FakeTemperClassifier(),
+        applier=applier,
+    )
+
+    result = service.apply_fav_songs(confirmed=True, max_tracks=1)
+
+    changes, confirmed = applier.calls[0]
+    copy_changes = [change for change in changes if change.action == "copy_track"]
+    assert confirmed is True
+    assert result["preview"]["total_assignments"] == 1
+    assert result["preview"]["assignments"][0]["item_id"] == "track-1"
+    assert len(copy_changes) == 1
+    assert copy_changes[0].path[0] == "track-1"
+
+
 def test_mini_test_uses_first_favourite_track_and_reports_cleanup():
     applier = MiniTestApplier()
     service = CurationService(

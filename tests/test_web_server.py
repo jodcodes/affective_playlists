@@ -735,6 +735,83 @@ class TestCurationEndpoints:
         ]
         assert ws._curation_smoke_tokens[token]["used"] is True
 
+    def test_curation_apply_accepts_small_apply_limit(self, client, monkeypatch):
+        import src.web_server as ws
+
+        class FakeApplyTask:
+            def __init__(self):
+                self.calls = []
+
+            def apply_async(self, args, task_id):
+                self.calls.append({"args": args, "task_id": task_id})
+
+        class FakeJobStore:
+            def __init__(self):
+                self.created = []
+
+            def create_job(self, **kwargs):
+                self.created.append(kwargs)
+
+        class FakeService:
+            def get_fav_songs_snapshot(self):
+                return {
+                    "available": True,
+                    "fresh": True,
+                    "created_at": "2026-06-09T10:00:00Z",
+                }
+
+            def run_fav_songs_smoke_test(self):
+                return {"success": True}
+
+            def apply_fav_songs(self, confirmed):
+                raise AssertionError("full apply should not run synchronously")
+
+        task = FakeApplyTask()
+        store = FakeJobStore()
+        monkeypatch.setattr(ws, "CELERY_AVAILABLE", True)
+        monkeypatch.setattr(ws, "apply_curation", task, raising=False)
+        monkeypatch.setattr(ws, "get_job_store", lambda: store)
+        monkeypatch.setattr("src.web_server._get_curation_service", lambda: FakeService())
+        token = client.post(
+            "/api/curation/smoke-test", json={"scope": "fav_songs"}
+        ).get_json()["smoke_test_token"]
+
+        response = client.post(
+            "/api/curation/apply",
+            json={
+                "scope": "fav_songs",
+                "confirmed": True,
+                "mini_test_passed": True,
+                "smoke_test_token": token,
+                "max_tracks": 1,
+            },
+        )
+
+        payload = response.get_json()
+        assert response.status_code == 202
+        assert store.created[0]["payload"]["max_tracks"] == 1
+        assert task.calls == [
+            {
+                "args": [payload["job_id"], "fav_songs", 1],
+                "task_id": payload["job_id"],
+            }
+        ]
+
+    def test_curation_apply_rejects_invalid_small_apply_limit(self, client):
+        response = client.post(
+            "/api/curation/apply",
+            json={
+                "scope": "fav_songs",
+                "confirmed": True,
+                "mini_test_passed": True,
+                "smoke_test_token": "token",
+                "max_tracks": 0,
+            },
+        )
+
+        assert response.status_code == 400
+        assert response.get_json()["error"] == "max_tracks must be a positive integer"
+
     def test_curation_apply_queue_failure_keeps_smoke_test_token_reusable(
         self, client, monkeypatch
     ):

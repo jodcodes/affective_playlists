@@ -277,7 +277,13 @@ class MetadataFiller:
         Returns:
             Processing results
         """
-        results = {"success": True, "processed": 0, "enriched": 0, "skipped": 0}
+        results = {
+            "success": True,
+            "processed": 0,
+            "enriched": 0,
+            "skipped": 0,
+            "cover_art_embedded": 0,
+        }
 
         self.logger.info(f"Starting metadata enrichment for {len(tracks)} tracks")
 
@@ -363,6 +369,14 @@ class MetadataFiller:
                 self.logger.debug(f"  └─ Skipped: No enrichment data found")
                 results["skipped"] += 1
 
+            if self._embed_cover_art(
+                filepath,
+                artist=artist_name,
+                album=track.get("album"),
+                metadata=current_tags,
+            ):
+                results["cover_art_embedded"] += 1
+
             results["processed"] += 1
 
         self.logger.info(f"\n{'='*80}")
@@ -387,7 +401,13 @@ class MetadataFiller:
         Returns:
             Processing results
         """
-        results = {"success": True, "processed": 0, "enriched": 0, "skipped": 0}
+        results = {
+            "success": True,
+            "processed": 0,
+            "enriched": 0,
+            "skipped": 0,
+            "cover_art_embedded": 0,
+        }
 
         for filepath in tqdm(audio_files, desc="Processing files", unit="file"):
             # Read current tags
@@ -433,21 +453,44 @@ class MetadataFiller:
             else:
                 results["skipped"] += 1
 
-            # Embed cover art if MusicBrainz ID available
-            if current_tags.get("musicbrainz_release_id"):
-                mbid = current_tags.get("musicbrainz_release_id")
-                try:
-                    cover_success = self.cover_art_manager.enrich_with_cover_art(
-                        filepath, mbid=mbid, artist=artist, album=current_tags.get("album")
-                    )
-                    if cover_success:
-                        self.logger.debug(f"Cover art embedded: {title}")
-                except Exception as e:
-                    self.logger.debug(f"Cover art embedding failed for {title}: {e}")
+            if self._embed_cover_art(
+                filepath,
+                artist=artist,
+                album=current_tags.get("album"),
+                metadata=current_tags,
+            ):
+                results["cover_art_embedded"] += 1
 
             results["processed"] += 1
 
         return results
+
+    def _embed_cover_art(
+        self,
+        filepath: str,
+        artist: Optional[str],
+        album: Optional[str],
+        metadata: Dict[str, str],
+    ) -> bool:
+        """Best-effort cover-art embedding for local audio files."""
+        mbid = (
+            metadata.get("musicbrainz_release_id")
+            or metadata.get("musicbrainz_albumid")
+            or metadata.get("musicbrainz_releasegroupid")
+        )
+        if not mbid:
+            return False
+
+        try:
+            return self.cover_art_manager.enrich_with_cover_art(
+                filepath,
+                mbid=mbid,
+                artist=artist,
+                album=album,
+            )
+        except Exception as e:
+            self.logger.debug(f"Cover art embedding failed for {filepath}: {e}")
+            return False
 
     def _resolve_folder_path(self, folder_name: str) -> Optional[str]:
         """

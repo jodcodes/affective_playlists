@@ -24,6 +24,7 @@ def apply_curation(
     self,
     job_id: str,
     scope: str = "fav_songs",
+    max_tracks: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Apply playlist curation changes through a persisted background job."""
     job_store = get_job_store()
@@ -36,7 +37,11 @@ def apply_curation(
 
         job_store.update_job_status(job_id, "running")
 
-        result = CurationService().apply_fav_songs(confirmed=True)
+        service = CurationService()
+        if max_tracks is None:
+            result = service.apply_fav_songs(confirmed=True)
+        else:
+            result = service.apply_fav_songs(confirmed=True, max_tracks=max_tracks)
         job_store.store_result(
             job_id,
             result,

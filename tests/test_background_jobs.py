@@ -43,6 +43,15 @@ class TestTaskQueueInitialization:
         # Test that workers are initialized and ready
         assert True  # Placeholder
 
+    def test_task_queues_are_celery_queue_objects(self):
+        """Configured queues should be Kombu Queue objects accepted by Celery workers."""
+        from kombu import Queue
+
+        from src.celery_app import app
+
+        assert app.conf.task_queues
+        assert all(isinstance(queue, Queue) for queue in app.conf.task_queues)
+
     def test_health_check_includes_celery_status(self):
         """Health endpoint should show Celery status."""
         # GET /api/health should include celery_ready: true/false
@@ -218,6 +227,40 @@ class TestTaskExecution:
                 "result_metadata": {"format": "curation_apply", "version": 1},
             }
         ]
+
+    def test_apply_curation_task_passes_max_tracks_to_service(self, monkeypatch):
+        """Curation apply task should forward the optional small-apply limit."""
+        import src.tasks as tasks
+
+        class FakeJobStore:
+            def __init__(self):
+                self.statuses = []
+
+            def get_job(self, job_id):
+                return object()
+
+            def update_job_status(
+                self, job_id, new_status, error_message=None, error_code=None
+            ):
+                self.statuses.append(new_status)
+
+            def store_result(self, job_id, result_json, result_metadata=None):
+                self.result_json = result_json
+
+        class FakeService:
+            def apply_fav_songs(self, confirmed, max_tracks=None):
+                assert confirmed is True
+                assert max_tracks == 1
+                return {"success": True, "applied": 1, "failed": 0}
+
+        store = FakeJobStore()
+        monkeypatch.setattr(tasks, "get_job_store", lambda: store)
+        monkeypatch.setattr(tasks, "CurationService", FakeService)
+
+        result = tasks.apply_curation("curation-apply-1", "fav_songs", 1)
+
+        assert result["applied"] == 1
+        assert store.statuses == ["running", "completed"]
 
     def test_apply_curation_task_marks_failed_on_service_error(self, monkeypatch):
         """Curation apply task should persist failure details."""

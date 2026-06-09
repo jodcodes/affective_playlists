@@ -624,6 +624,15 @@ def curation_apply():
         if mini_test_passed is not True:
             return jsonify({"error": "mini_test_passed must be true"}), 400
 
+        max_tracks = data.get("max_tracks")
+        if max_tracks is not None:
+            if (
+                isinstance(max_tracks, bool)
+                or not isinstance(max_tracks, int)
+                or max_tracks < 1
+            ):
+                return jsonify({"error": "max_tracks must be a positive integer"}), 400
+
         smoke_test_token = data.get("smoke_test_token")
         token_record = (
             _curation_smoke_tokens.get(smoke_test_token)
@@ -672,20 +681,27 @@ def curation_apply():
 
         job_id = f"curation-apply-{int(time.time())}-{uuid.uuid4().hex[:8]}"
         job_store = get_job_store()
+        job_payload = {
+            "scope": scope,
+            "snapshot_created_at": snapshot_created_at,
+        }
+        if max_tracks is not None:
+            job_payload["max_tracks"] = max_tracks
+
         job_store.create_job(
             job_id=job_id,
             job_type="curation_apply",
-            payload={
-                "scope": scope,
-                "snapshot_created_at": snapshot_created_at,
-            },
+            payload=job_payload,
             user_agent=request.headers.get("User-Agent"),
             client_ip=request.remote_addr,
         )
 
         try:
+            task_args = [job_id, scope]
+            if max_tracks is not None:
+                task_args.append(max_tracks)
             apply_curation.apply_async(
-                args=[job_id, scope],
+                args=task_args,
                 task_id=job_id,
             )
         except Exception as queue_error:

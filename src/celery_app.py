@@ -9,6 +9,7 @@ References: openspec/specs/background-jobs/spec.md
 import os
 
 from celery import Celery
+from kombu import Queue
 
 from src.logger import setup_logger
 
@@ -50,11 +51,11 @@ app.conf.update(
 
 # Task queue definitions
 app.conf.task_queues = (
-    ("enrichment", {"routing_key": "enrichment.#"}),
-    ("temperament", {"routing_key": "temperament.#"}),
-    ("organization", {"routing_key": "organization.#"}),
-    ("background", {"routing_key": "background.#"}),
-    ("default", {"routing_key": "default.#"}),
+    Queue("enrichment", routing_key="enrichment.#"),
+    Queue("temperament", routing_key="temperament.#"),
+    Queue("organization", routing_key="organization.#"),
+    Queue("background", routing_key="background.#"),
+    Queue("default", routing_key="default.#"),
 )
 
 if __name__ == "__main__":
