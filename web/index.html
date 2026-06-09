@@ -239,35 +239,50 @@
 
             <!-- Curation Review View -->
             <section id="curation-view" class="view">
-                <div class="curation-header card">
-                    <div>
-                        <h3>Curation Review</h3>
-                        <p class="text-muted">Fav Songs organized as genre folders with four temper playlists per genre.</p>
-                    </div>
-                    <div class="curation-actions">
-                        <button class="btn btn-secondary" id="curation-refresh-btn">Refresh</button>
-                        <button class="btn btn-primary" id="curation-dry-run-btn">Dry Run</button>
-                        <button class="btn btn-secondary" id="curation-apply-btn" disabled>Apply</button>
-                    </div>
-                </div>
-
-                <div id="curation-summary" class="curation-summary"></div>
-
-                <div class="curation-layout">
-                    <aside id="curation-genre-tree" class="curation-genre-tree card">
-                        <p class="text-muted">Load a curation preview to review genres.</p>
+                <div class="control-center">
+                    <aside class="control-rail">
+                        <h3>Fav Songs</h3>
+                        <div id="curation-system-status" class="system-status">
+                            <div><span>SSD</span><strong>Unknown</strong></div>
+                            <div><span>Music.app</span><strong>Unknown</strong></div>
+                            <div><span>Snapshot</span><strong>Not loaded</strong></div>
+                        </div>
                     </aside>
 
-                    <section id="curation-review-panel" class="curation-review-panel">
-                        <div class="card curation-empty-state">
-                            <h3>No Preview Loaded</h3>
-                            <p class="text-muted">Run a dry-run preview to inspect Favourite Songs by genre and temper.</p>
+                    <section class="control-main">
+                        <div class="control-main-header">
+                            <div>
+                                <h3>Fav Songs</h3>
+                                <p class="text-muted">Genre folders with four temper playlists per genre.</p>
+                            </div>
+                            <div class="curation-actions">
+                                <button class="btn btn-secondary" id="curation-load-snapshot-btn">Snapshot laden</button>
+                                <button class="btn btn-primary" id="curation-refresh-btn">Neu lesen</button>
+                            </div>
                         </div>
+
+                        <div id="curation-summary" class="curation-summary"></div>
+
+                        <div class="matrix-toolbar">
+                            <input id="curation-genre-filter" class="search-input" type="search" aria-label="Genre suchen">
+                            <button class="btn btn-secondary" id="curation-problems-only-btn" type="button">Nur Probleme</button>
+                            <button class="btn btn-secondary" id="curation-top-genres-btn" type="button">Top Genres</button>
+                        </div>
+
+                        <section id="curation-review-panel" class="curation-review-panel">
+                            <div class="card curation-empty-state">
+                                <h3>No Snapshot Loaded</h3>
+                                <p class="text-muted">Load the last snapshot or read Music.app again.</p>
+                            </div>
+                        </section>
                     </section>
 
-                    <aside id="curation-change-panel" class="curation-change-panel card">
-                        <h3>Dry-run Changes</h3>
-                        <p class="text-muted">No changes loaded.</p>
+                    <aside id="curation-write-panel" class="write-safety-panel">
+                        <h3>Schreibschutz</h3>
+                        <p class="text-muted">Full apply is locked until a fresh snapshot and mini-test are available.</p>
+                        <button class="btn btn-secondary" id="curation-smoke-test-btn" type="button" disabled>Mini-Test ausführen</button>
+                        <button class="btn btn-primary" id="curation-apply-btn" type="button" disabled>Full Apply vorbereiten</button>
+                        <div id="curation-change-panel" class="curation-change-panel"></div>
                     </aside>
                 </div>
             </section>
