@@ -530,6 +530,10 @@ class CoverArtEmbedder:
         Returns:
             True if successful
         """
+        if not os.path.exists(filepath):
+            self.logger.warning(f"File not found: {filepath}")
+            return False
+
         ext = os.path.splitext(filepath)[1].lower()
 
         if ext in {".m4a", ".mp4"}:
