@@ -126,24 +126,54 @@ def _init_playlists_from_apple_music():
         session = SessionLocal()
 
         try:
-            # Clear old playlists
-            session.query(Playlist).delete()
-            session.commit()
-
-            # Insert new playlists
+            playlists_by_id = {}
             for p in playlists:
-                playlist = Playlist(
-                    persistent_id=str(p.get("id", "")),
-                    name=str(p.get("name", "Unnamed")),
-                    track_count=int(p.get("track_count", 0)),
-                    genre=p.get("genre"),
-                    created_date=p.get("created_date"),
+                playlist_id = str(p.get("id", "")).strip()
+                if not playlist_id:
+                    continue
+                playlists_by_id[playlist_id] = {
+                    **p,
+                    "id": playlist_id,
+                    "name": str(p.get("name", "Unnamed")),
+                    "track_count": int(p.get("track_count", 0)),
+                }
+
+            if not playlists_by_id:
+                logger.warning("No cacheable playlists returned from Apple Music")
+                return
+
+            if len(playlists_by_id) != len(playlists):
+                logger.info(
+                    "Deduplicated playlist cache input from %s to %s records",
+                    len(playlists),
+                    len(playlists_by_id),
                 )
-                session.add(playlist)
+
+            existing = {
+                playlist.persistent_id: playlist
+                for playlist in session.query(Playlist)
+                .filter(Playlist.persistent_id.in_(playlists_by_id.keys()))
+                .all()
+            }
+
+            # Upsert current playlists so duplicate Music.app IDs cannot break startup.
+            for playlist_id, p in playlists_by_id.items():
+                playlist = existing.get(playlist_id)
+                if playlist is None:
+                    playlist = Playlist(persistent_id=playlist_id)
+                    session.add(playlist)
+                playlist.name = p["name"]
+                playlist.track_count = p["track_count"]
+                playlist.genre = p.get("genre")
+                playlist.created_date = p.get("created_date")
+
+            session.query(Playlist).filter(
+                ~Playlist.persistent_id.in_(playlists_by_id.keys())
+            ).delete(synchronize_session=False)
 
             session.commit()
-            _playlists_cache = playlists
-            logger.info(f"Successfully cached {len(playlists)} playlists to DB")
+            _playlists_cache = list(playlists_by_id.values())
+            logger.info(f"Successfully cached {len(playlists_by_id)} playlists to DB")
         except Exception as e:
             logger.error(f"Failed to save playlists to DB: {e}")
             session.rollback()

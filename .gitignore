@@ -61,6 +61,7 @@ pylint_output*.txt
 cache/
 *.db
 *.sqlite
+data/curation_snapshots.json
 data/artist_lists/  # Keep structure but ignore generated files
 
 # Results and outputs

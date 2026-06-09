@@ -184,6 +184,48 @@ class TestConfigEndpoint:
 class TestPlaylistsEndpoint:
     """Tests for GET /api/playlists endpoint."""
 
+    def test_playlist_cache_initialization_deduplicates_persistent_ids(
+        self, tmp_path, monkeypatch
+    ):
+        """Apple Music cache sync should tolerate duplicate persistent IDs."""
+        import src.db as db
+        import src.web_server as ws
+        from src.db import Playlist
+
+        database_url = f"sqlite:///{tmp_path / 'jobs.db'}"
+        original_init_db = db.init_db
+
+        def init_temp_db():
+            return original_init_db(database_url)
+
+        class DuplicatePlaylistManager:
+            def get_all_playlists(self):
+                return [
+                    {"id": "duplicate-id", "name": "Old Name", "track_count": 1},
+                    {"id": "duplicate-id", "name": "New Name", "track_count": 2},
+                    {"id": "unique-id", "name": "Unique", "track_count": 3},
+                ]
+
+        monkeypatch.setattr(db, "init_db", init_temp_db)
+        monkeypatch.setattr(
+            ws, "_get_playlist_manager", lambda: DuplicatePlaylistManager()
+        )
+
+        ws._init_playlists_from_apple_music()
+
+        _, SessionLocal = original_init_db(database_url)
+        session = SessionLocal()
+        try:
+            playlists = session.query(Playlist).all()
+            duplicate = session.get(Playlist, "duplicate-id")
+        finally:
+            session.close()
+
+        assert len(playlists) == 2
+        assert duplicate.name == "New Name"
+        assert duplicate.track_count == 2
+        assert len(ws._playlists_cache) == 2
+
     def test_playlists_returns_200(self, client):
         """Playlists endpoint should return 200 OK."""
         response = client.get("/api/playlists")
