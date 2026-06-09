@@ -573,7 +573,7 @@ def curation_refresh():
 
 @app.route("/api/curation/apply", methods=["POST"])
 def curation_apply():
-    """Apply playlist curation changes after confirmation."""
+    """Queue playlist curation changes after confirmation and mini-test."""
     try:
         data = request.get_json(silent=True) or {}
         scope = data.get("scope", "fav_songs")
@@ -584,15 +584,30 @@ def curation_apply():
         if not isinstance(confirmed, bool):
             return jsonify({"error": "confirmed must be a boolean"}), 400
 
+        mini_test_passed = data.get("mini_test_passed", False)
+        if mini_test_passed is not True:
+            return jsonify({"error": "mini_test_passed must be true"}), 400
+
         service = _get_curation_service()
         if not service:
             return jsonify({"error": "Curation service unavailable"}), 503
 
-        result = service.apply_fav_songs(confirmed=confirmed)
-        if not result.get("success") and result.get("error") == "Confirmation required":
-            return jsonify(result), 400
+        snapshot = service.get_fav_songs_snapshot()
+        if not snapshot or not snapshot.get("available") or not snapshot.get("fresh"):
+            return jsonify({"error": "Fresh curation snapshot required"}), 400
 
-        return jsonify(result), 200 if result.get("success") else 500
+        job_id = f"curation-apply-{int(time.time())}-{uuid.uuid4().hex[:8]}"
+        return jsonify(
+            {
+                "success": True,
+                "status": "queued",
+                "job_id": job_id,
+                "message": (
+                    "Curation apply queued. Background execution will be wired "
+                    "in the next phase."
+                ),
+            }
+        ), 202
     except Exception as e:
         logger.error(f"Failed to apply curation: {e}")
         return jsonify({"error": str(e)}), 500

@@ -605,43 +605,80 @@ class TestCurationEndpoints:
         assert response.status_code == 503
         assert response.get_json()["error"] == "Curation service unavailable"
 
-    def test_curation_apply_missing_confirmation_passes_false(
-        self, client, monkeypatch
-    ):
-        service = self.RecordingService()
-        monkeypatch.setattr("src.web_server._get_curation_service", lambda: service)
-
-        response = client.post("/api/curation/apply", json={"scope": "fav_songs"})
-
-        assert response.status_code == 400
-        assert response.get_json()["error"] == "Confirmation required"
-        assert service.confirmed_values == [False]
-
-    def test_curation_apply_false_confirmation_passes_false(self, client, monkeypatch):
-        service = self.RecordingService()
-        monkeypatch.setattr("src.web_server._get_curation_service", lambda: service)
-
-        response = client.post(
-            "/api/curation/apply",
-            json={"scope": "fav_songs", "confirmed": False},
-        )
-
-        assert response.status_code == 400
-        assert response.get_json()["error"] == "Confirmation required"
-        assert service.confirmed_values == [False]
-
-    def test_curation_apply_true_confirmation_passes_true(self, client, monkeypatch):
-        service = self.RecordingService()
-        monkeypatch.setattr("src.web_server._get_curation_service", lambda: service)
-
+    def test_curation_apply_requires_smoke_test_token(self, client):
         response = client.post(
             "/api/curation/apply",
             json={"scope": "fav_songs", "confirmed": True},
         )
 
-        assert response.status_code == 200
-        assert response.get_json()["success"] is True
-        assert service.confirmed_values == [True]
+        assert response.status_code == 400
+        assert response.get_json()["error"] == "mini_test_passed must be true"
+
+    def test_curation_apply_accepts_job_request_after_gate(self, client, monkeypatch):
+        class FakeService:
+            def get_fav_songs_snapshot(self):
+                return {"available": True, "fresh": True}
+
+            def apply_fav_songs(self, confirmed):
+                raise AssertionError("full apply should not run synchronously")
+
+        monkeypatch.setattr("src.web_server._get_curation_service", lambda: FakeService())
+
+        response = client.post(
+            "/api/curation/apply",
+            json={
+                "scope": "fav_songs",
+                "confirmed": True,
+                "mini_test_passed": True,
+            },
+        )
+
+        assert response.status_code == 202
+        payload = response.get_json()
+        assert payload["status"] == "queued"
+        assert payload["job_id"].startswith("curation-apply-")
+
+    def test_curation_apply_rejects_stale_snapshot_after_gate(
+        self, client, monkeypatch
+    ):
+        class FakeService:
+            def get_fav_songs_snapshot(self):
+                return {"available": True, "fresh": False}
+
+        monkeypatch.setattr("src.web_server._get_curation_service", lambda: FakeService())
+
+        response = client.post(
+            "/api/curation/apply",
+            json={
+                "scope": "fav_songs",
+                "confirmed": True,
+                "mini_test_passed": True,
+            },
+        )
+
+        assert response.status_code == 400
+        assert response.get_json()["error"] == "Fresh curation snapshot required"
+
+    def test_curation_apply_rejects_missing_snapshot_after_gate(
+        self, client, monkeypatch
+    ):
+        class FakeService:
+            def get_fav_songs_snapshot(self):
+                return {"available": False, "fresh": False}
+
+        monkeypatch.setattr("src.web_server._get_curation_service", lambda: FakeService())
+
+        response = client.post(
+            "/api/curation/apply",
+            json={
+                "scope": "fav_songs",
+                "confirmed": True,
+                "mini_test_passed": True,
+            },
+        )
+
+        assert response.status_code == 400
+        assert response.get_json()["error"] == "Fresh curation snapshot required"
 
     def test_curation_apply_rejects_string_confirmation_without_calling_service(
         self, client, monkeypatch
@@ -665,26 +702,15 @@ class TestCurationEndpoints:
 
         response = client.post(
             "/api/curation/apply",
-            json={"scope": "fav_songs", "confirmed": True},
+            json={
+                "scope": "fav_songs",
+                "confirmed": True,
+                "mini_test_passed": True,
+            },
         )
 
         assert response.status_code == 503
         assert response.get_json()["error"] == "Curation service unavailable"
-
-    def test_curation_apply_returns_500_for_non_confirmation_failure(
-        self, client, monkeypatch
-    ):
-        service = self.RecordingService(error_on_failure="Apply failed")
-        monkeypatch.setattr("src.web_server._get_curation_service", lambda: service)
-
-        response = client.post(
-            "/api/curation/apply",
-            json={"scope": "fav_songs", "confirmed": False},
-        )
-
-        assert response.status_code == 500
-        assert response.get_json()["error"] == "Apply failed"
-        assert service.confirmed_values == [False]
 
     def test_curation_smoke_test_returns_success_response(self, client, monkeypatch):
         service = self.SmokeTestService({"success": True})

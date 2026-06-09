@@ -1156,12 +1156,14 @@ async function applyFavSongsCuration() {
         showSpinner(true);
         const result = await app.api('/curation/apply', {
             method: 'POST',
-            body: { scope: 'fav_songs', confirmed: true },
+            body: {
+                scope: 'fav_songs',
+                confirmed: true,
+                mini_test_passed: hasPassedSmokeTestForCurrentSnapshot(),
+            },
         });
 
-        const applied = asNumber(result.applied);
-        const failed = asNumber(result.failed);
-        showAlert(`Applied ${applied} curation change${applied === 1 ? '' : 's'}${failed ? `, ${failed} failed` : ''}.`, 'success');
+        showAlert(`Curation apply queued: ${result.job_id}`, 'success');
         curationApplyInFlight = false;
         setCurationButtonsState();
         await loadCurationSnapshot();
