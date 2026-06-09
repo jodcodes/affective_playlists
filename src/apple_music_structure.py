@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+import uuid
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -169,7 +170,9 @@ class AppleMusicStructureApplier:
     def run_smoke_test(
         self, track_id: str, stamp: str | None = None
     ) -> dict[str, Any]:
-        stamp = stamp or datetime.now().strftime("%Y%m%d-%H%M%S")
+        stamp = stamp or (
+            f"{datetime.now().strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:12]}"
+        )
         root = f"__Codex Curation Smoke Test {stamp}"
         genre = f"Smoke Genre {stamp}"
         playlist = f"Smoke One Track {stamp}"
@@ -198,14 +201,37 @@ class AppleMusicStructureApplier:
             ),
         ]
 
-        apply_result = self.apply_changes(changes, confirmed=True)
-        leftovers = self._cleanup_smoke_test(root, genre, playlist)
-        copied = 1 if int(apply_result.get("applied", 0)) >= 4 else 0
-        duplicate_skipped = int(apply_result.get("applied", 0)) >= 5
+        error = None
+        try:
+            apply_result = self._run_smoke_changes(changes)
+        except Exception as exc:  # defensive: cleanup must still run
+            error = str(exc)
+            apply_result = {
+                "success": False,
+                "applied": 0,
+                "failed": 1,
+                "errors": [{"stdout": "", "stderr": str(exc)}],
+                "steps": [],
+            }
+        cleanup_result = self._cleanup_smoke_test(root, genre, playlist)
+        leftovers = cleanup_result["leftovers"]
+        cleanup_errors = cleanup_result["errors"]
+        steps = apply_result.get("steps", [])
+        first_copy_stdout = (
+            steps[3].get("stdout", "").lower() if len(steps) > 3 else ""
+        )
+        second_copy_stdout = (
+            steps[4].get("stdout", "").lower() if len(steps) > 4 else ""
+        )
+        copied = 1 if "track copied" in first_copy_stdout else 0
+        duplicate_skipped = "track already exists" in second_copy_stdout
 
-        return {
+        result = {
             "success": bool(apply_result.get("success"))
-            and all(count == 0 for count in leftovers.values()),
+            and copied == 1
+            and duplicate_skipped
+            and all(count == 0 for count in leftovers.values())
+            and not cleanup_errors,
             "track_id": track_id,
             "root": root,
             "genre": genre,
@@ -214,11 +240,96 @@ class AppleMusicStructureApplier:
             "duplicate_skipped": duplicate_skipped,
             "leftovers": leftovers,
             "apply_result": apply_result,
+            "cleanup_errors": cleanup_errors,
         }
+        if error:
+            result["error"] = error
+        return result
+
+    def _run_smoke_changes(
+        self, changes: Sequence[AppleMusicChange]
+    ) -> dict[str, Any]:
+        if not Path(self.script_path).is_file():
+            return {
+                "success": False,
+                "error": f"Script not found: {self.script_path}",
+                "applied": 0,
+                "failed": 0,
+                "errors": [],
+                "steps": [],
+            }
+
+        applied = 0
+        failed = 0
+        errors: list[dict[str, Any]] = []
+        steps: list[dict[str, Any]] = []
+
+        for change in changes:
+            step = self._run_smoke_change(change)
+            steps.append(step)
+            if step["success"]:
+                applied += 1
+                continue
+            failed += 1
+            errors.append(
+                {
+                    "change": change.to_dict(),
+                    "stdout": step["stdout"],
+                    "stderr": step["stderr"],
+                }
+            )
+
+        return {
+            "success": failed == 0,
+            "applied": applied,
+            "failed": failed,
+            "errors": errors,
+            "steps": steps,
+        }
+
+    def _run_smoke_change(self, change: AppleMusicChange) -> dict[str, Any]:
+        command = [
+            "osascript",
+            self.script_path,
+            change.action,
+            *change.path,
+        ]
+        try:
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+            stdout = _strip_process_output(result.stdout)
+            stderr = _strip_process_output(result.stderr)
+            return {
+                "success": result.returncode == 0 and "SUCCESS" in stdout,
+                "action": change.action,
+                "stdout": stdout,
+                "stderr": stderr,
+                "returncode": result.returncode,
+            }
+        except subprocess.TimeoutExpired as exc:
+            return {
+                "success": False,
+                "action": change.action,
+                "stdout": _strip_process_output(exc.output),
+                "stderr": _strip_process_output(exc.stderr) or str(exc),
+                "returncode": None,
+            }
+        except OSError as exc:
+            return {
+                "success": False,
+                "action": change.action,
+                "stdout": "",
+                "stderr": str(exc),
+                "returncode": None,
+            }
 
     def _cleanup_smoke_test(
         self, root: str, genre: str, playlist: str
-    ) -> dict[str, int]:
+    ) -> dict[str, Any]:
         delete_playlist = f"""
 tell application "Music"
     set playlistName to {_applescript_string(playlist)}
@@ -260,34 +371,115 @@ tell application "Music"
 end tell
 """
 
-        for script in (delete_playlist, delete_genre, delete_root):
-            subprocess.run(
+        errors: list[dict[str, Any]] = []
+        for name, script in (
+            ("delete_playlist", delete_playlist),
+            ("delete_genre", delete_genre),
+            ("delete_root", delete_root),
+        ):
+            error = self._run_cleanup_script(name, script)
+            if error:
+                errors.append(error)
+
+        leftovers: dict[str, int] = {}
+        for name, count in (
+            ("root", self._count_smoke_root(root)),
+            ("genre", self._count_smoke_genre(root, genre)),
+            ("playlist", self._count_smoke_playlist(root, genre, playlist)),
+        ):
+            leftovers[name] = count["count"]
+            errors.extend(count["errors"])
+
+        return {
+            "leftovers": leftovers,
+            "errors": errors,
+        }
+
+    def _run_cleanup_script(self, name: str, script: str) -> dict[str, Any] | None:
+        try:
+            result = subprocess.run(
                 ["osascript", "-e", script],
                 capture_output=True,
                 text=True,
                 timeout=60,
             )
+        except subprocess.TimeoutExpired as exc:
+            return {
+                "phase": "cleanup",
+                "name": name,
+                "stdout": _strip_process_output(exc.output),
+                "stderr": _strip_process_output(exc.stderr) or str(exc),
+            }
+        except OSError as exc:
+            return {
+                "phase": "cleanup",
+                "name": name,
+                "stdout": "",
+                "stderr": str(exc),
+            }
 
+        if result.returncode == 0:
+            return None
         return {
-            "root": self._count_smoke_root(root),
-            "genre": self._count_smoke_genre(root, genre),
-            "playlist": self._count_smoke_playlist(root, genre, playlist),
+            "phase": "cleanup",
+            "name": name,
+            "stdout": _strip_process_output(result.stdout),
+            "stderr": _strip_process_output(result.stderr),
         }
 
-    def _run_count_script(self, script: str) -> int:
-        result = subprocess.run(
-            ["osascript", "-e", script],
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
+    def _run_count_script(self, name: str, script: str) -> dict[str, Any]:
         try:
-            return int(_strip_process_output(result.stdout))
-        except ValueError:
-            return -1
+            result = subprocess.run(
+                ["osascript", "-e", script],
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+        except subprocess.TimeoutExpired as exc:
+            return {
+                "count": -1,
+                "errors": [
+                    {
+                        "phase": "count",
+                        "name": name,
+                        "stdout": _strip_process_output(exc.output),
+                        "stderr": _strip_process_output(exc.stderr) or str(exc),
+                    }
+                ],
+            }
+        except OSError as exc:
+            return {
+                "count": -1,
+                "errors": [
+                    {
+                        "phase": "count",
+                        "name": name,
+                        "stdout": "",
+                        "stderr": str(exc),
+                    }
+                ],
+            }
 
-    def _count_smoke_root(self, root: str) -> int:
+        try:
+            count = int(_strip_process_output(result.stdout))
+        except ValueError:
+            count = -1
+
+        errors = []
+        if result.returncode != 0:
+            errors.append(
+                {
+                    "phase": "count",
+                    "name": name,
+                    "stdout": _strip_process_output(result.stdout),
+                    "stderr": _strip_process_output(result.stderr),
+                }
+            )
+        return {"count": count, "errors": errors}
+
+    def _count_smoke_root(self, root: str) -> dict[str, Any]:
         return self._run_count_script(
+            "root",
             f"""
 tell application "Music"
     return count of (every folder playlist whose name is {_applescript_string(root)})
@@ -295,8 +487,9 @@ end tell
 """
         )
 
-    def _count_smoke_genre(self, root: str, genre: str) -> int:
+    def _count_smoke_genre(self, root: str, genre: str) -> dict[str, Any]:
         return self._run_count_script(
+            "genre",
             f"""
 tell application "Music"
     set genreName to {_applescript_string(genre)}
@@ -313,8 +506,9 @@ end tell
 """
         )
 
-    def _count_smoke_playlist(self, root: str, genre: str, playlist: str) -> int:
+    def _count_smoke_playlist(self, root: str, genre: str, playlist: str) -> dict[str, Any]:
         return self._run_count_script(
+            "playlist",
             f"""
 tell application "Music"
     set playlistName to {_applescript_string(playlist)}

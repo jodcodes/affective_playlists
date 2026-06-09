@@ -1,4 +1,5 @@
 from pathlib import Path
+from datetime import datetime
 import shutil
 import subprocess
 from types import SimpleNamespace
@@ -270,8 +271,8 @@ def test_applier_smoke_test_copies_once_skips_duplicate_and_cleans_up(tmp_path):
             SimpleNamespace(returncode=0, stdout="SUCCESS", stderr=""),
             SimpleNamespace(returncode=0, stdout="SUCCESS", stderr=""),
             SimpleNamespace(returncode=0, stdout="SUCCESS", stderr=""),
-            SimpleNamespace(returncode=0, stdout="SUCCESS", stderr=""),
-            SimpleNamespace(returncode=0, stdout="SUCCESS", stderr=""),
+            SimpleNamespace(returncode=0, stdout="SUCCESS: track copied", stderr=""),
+            SimpleNamespace(returncode=0, stdout="SUCCESS: track already exists", stderr=""),
             SimpleNamespace(returncode=0, stdout="", stderr=""),
             SimpleNamespace(returncode=0, stdout="", stderr=""),
             SimpleNamespace(returncode=0, stdout="", stderr=""),
@@ -292,6 +293,122 @@ def test_applier_smoke_test_copies_once_skips_duplicate_and_cleans_up(tmp_path):
     assert result["leftovers"] == {"root": 0, "genre": 0, "playlist": 0}
     assert result["apply_result"]["applied"] == 5
     assert run.call_count == 11
+
+
+def test_applier_smoke_test_cleans_up_when_apply_raises(tmp_path):
+    script_path = tmp_path / "curation_structure.applescript"
+    script_path.write_text("-- test script", encoding="utf-8")
+    applier = AppleMusicStructureApplier(script_path=str(script_path))
+
+    with patch("src.apple_music_structure.subprocess.run") as run:
+        run.side_effect = [
+            RuntimeError("unexpected apply failure"),
+            SimpleNamespace(returncode=0, stdout="", stderr=""),
+            SimpleNamespace(returncode=0, stdout="", stderr=""),
+            SimpleNamespace(returncode=0, stdout="", stderr=""),
+            SimpleNamespace(returncode=0, stdout="0", stderr=""),
+            SimpleNamespace(returncode=0, stdout="0", stderr=""),
+            SimpleNamespace(returncode=0, stdout="0", stderr=""),
+        ]
+
+        result = applier.run_smoke_test("track-1", stamp="20260609-apply-raises")
+
+    assert result["success"] is False
+    assert result["copied"] == 0
+    assert result["duplicate_skipped"] is False
+    assert "unexpected apply failure" in result["error"]
+    assert result["leftovers"] == {"root": 0, "genre": 0, "playlist": 0}
+    assert run.call_count == 7
+
+
+def test_applier_smoke_test_reports_cleanup_and_count_failures(tmp_path):
+    script_path = tmp_path / "curation_structure.applescript"
+    script_path.write_text("-- test script", encoding="utf-8")
+    applier = AppleMusicStructureApplier(script_path=str(script_path))
+
+    with patch("src.apple_music_structure.subprocess.run") as run:
+        run.side_effect = [
+            SimpleNamespace(returncode=0, stdout="SUCCESS", stderr=""),
+            SimpleNamespace(returncode=0, stdout="SUCCESS", stderr=""),
+            SimpleNamespace(returncode=0, stdout="SUCCESS", stderr=""),
+            SimpleNamespace(returncode=0, stdout="SUCCESS: track copied", stderr=""),
+            SimpleNamespace(returncode=0, stdout="SUCCESS: track already exists", stderr=""),
+            subprocess.TimeoutExpired(cmd=["osascript"], timeout=60),
+            OSError("cleanup unavailable"),
+            SimpleNamespace(returncode=0, stdout="", stderr=""),
+            subprocess.TimeoutExpired(cmd=["osascript"], timeout=60),
+            OSError("count unavailable"),
+            SimpleNamespace(returncode=0, stdout="0", stderr=""),
+        ]
+
+        result = applier.run_smoke_test("track-1", stamp="20260609-cleanup-fails")
+
+    assert result["success"] is False
+    assert result["copied"] == 1
+    assert result["duplicate_skipped"] is True
+    assert result["leftovers"] == {"root": -1, "genre": -1, "playlist": 0}
+    assert len(result["cleanup_errors"]) == 4
+
+
+def test_applier_smoke_test_default_stamps_are_collision_resistant(tmp_path):
+    script_path = tmp_path / "curation_structure.applescript"
+    script_path.write_text("-- test script", encoding="utf-8")
+    applier = AppleMusicStructureApplier(script_path=str(script_path))
+
+    responses = [
+        SimpleNamespace(returncode=0, stdout="SUCCESS", stderr=""),
+        SimpleNamespace(returncode=0, stdout="SUCCESS", stderr=""),
+        SimpleNamespace(returncode=0, stdout="SUCCESS", stderr=""),
+        SimpleNamespace(returncode=0, stdout="SUCCESS: track copied", stderr=""),
+        SimpleNamespace(returncode=0, stdout="SUCCESS: track already exists", stderr=""),
+        SimpleNamespace(returncode=0, stdout="", stderr=""),
+        SimpleNamespace(returncode=0, stdout="", stderr=""),
+        SimpleNamespace(returncode=0, stdout="", stderr=""),
+        SimpleNamespace(returncode=0, stdout="0", stderr=""),
+        SimpleNamespace(returncode=0, stdout="0", stderr=""),
+        SimpleNamespace(returncode=0, stdout="0", stderr=""),
+    ]
+
+    with (
+        patch("src.apple_music_structure.datetime") as datetime_class,
+        patch("src.apple_music_structure.subprocess.run") as run,
+    ):
+        datetime_class.now.return_value = datetime(2026, 6, 9, 0, 0, 0)
+        run.side_effect = responses + responses
+
+        first = applier.run_smoke_test("track-1")
+        second = applier.run_smoke_test("track-1")
+
+    assert first["root"] != second["root"]
+    assert first["root"].startswith("__Codex Curation Smoke Test 20260609-000000-")
+    assert second["root"].startswith("__Codex Curation Smoke Test 20260609-000000-")
+
+
+def test_applier_smoke_test_classifies_copy_results_from_copy_stdout(tmp_path):
+    script_path = tmp_path / "curation_structure.applescript"
+    script_path.write_text("-- test script", encoding="utf-8")
+    applier = AppleMusicStructureApplier(script_path=str(script_path))
+
+    with patch("src.apple_music_structure.subprocess.run") as run:
+        run.side_effect = [
+            SimpleNamespace(returncode=0, stdout="SUCCESS", stderr=""),
+            SimpleNamespace(returncode=0, stdout="SUCCESS", stderr=""),
+            SimpleNamespace(returncode=0, stdout="SUCCESS", stderr=""),
+            SimpleNamespace(returncode=0, stdout="SUCCESS: playlist touched", stderr=""),
+            SimpleNamespace(returncode=0, stdout="SUCCESS: duplicate touched", stderr=""),
+            SimpleNamespace(returncode=0, stdout="", stderr=""),
+            SimpleNamespace(returncode=0, stdout="", stderr=""),
+            SimpleNamespace(returncode=0, stdout="", stderr=""),
+            SimpleNamespace(returncode=0, stdout="0", stderr=""),
+            SimpleNamespace(returncode=0, stdout="0", stderr=""),
+            SimpleNamespace(returncode=0, stdout="0", stderr=""),
+        ]
+
+        result = applier.run_smoke_test("track-1", stamp="20260609-copy-classify")
+
+    assert result["success"] is False
+    assert result["copied"] == 0
+    assert result["duplicate_skipped"] is False
 
 
 def test_applescript_copy_track_searches_favourite_songs_before_library():
