@@ -113,6 +113,29 @@ class CurationService:
         payload = self._snapshot_payload(preview)
         return self.snapshot_store.save_snapshot("fav_songs", payload)
 
+    def run_fav_songs_smoke_test(self) -> Dict[str, Any]:
+        tracks = self.apple_music.get_favourite_tracks()
+        for track in tracks:
+            track_id = str(track.get("persistent_id") or track.get("id") or "").strip()
+            if not track_id:
+                continue
+
+            result = self.applier.run_smoke_test(track_id)
+            result["source_track"] = {
+                "persistent_id": track_id,
+                "name": str(track.get("name") or track.get("title") or "Unknown Track"),
+                "artist": str(track.get("artist") or ""),
+            }
+            return result
+
+        return {
+            "success": False,
+            "error": "No Favourite Songs track with a stable persistent ID was found",
+            "copied": 0,
+            "duplicate_skipped": False,
+            "leftovers": {},
+        }
+
     def _snapshot_payload(self, preview: Dict[str, Any]) -> Dict[str, Any]:
         grouped = preview.get("grouped") or {}
         changes = preview.get("changes") or []

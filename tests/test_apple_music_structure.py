@@ -260,6 +260,40 @@ def test_applier_reports_missing_script_and_rejects_directories(tmp_path):
     assert result["failed"] == 0
 
 
+def test_applier_smoke_test_copies_once_skips_duplicate_and_cleans_up(tmp_path):
+    script_path = tmp_path / "curation_structure.applescript"
+    script_path.write_text("-- test script", encoding="utf-8")
+    applier = AppleMusicStructureApplier(script_path=str(script_path))
+
+    with patch("src.apple_music_structure.subprocess.run") as run:
+        run.side_effect = [
+            SimpleNamespace(returncode=0, stdout="SUCCESS", stderr=""),
+            SimpleNamespace(returncode=0, stdout="SUCCESS", stderr=""),
+            SimpleNamespace(returncode=0, stdout="SUCCESS", stderr=""),
+            SimpleNamespace(returncode=0, stdout="SUCCESS", stderr=""),
+            SimpleNamespace(returncode=0, stdout="SUCCESS", stderr=""),
+            SimpleNamespace(returncode=0, stdout="", stderr=""),
+            SimpleNamespace(returncode=0, stdout="", stderr=""),
+            SimpleNamespace(returncode=0, stdout="", stderr=""),
+            SimpleNamespace(returncode=0, stdout="0", stderr=""),
+            SimpleNamespace(returncode=0, stdout="0", stderr=""),
+            SimpleNamespace(returncode=0, stdout="0", stderr=""),
+        ]
+
+        result = applier.run_smoke_test("track-1", stamp="20260609-000000")
+
+    assert result["success"] is True
+    assert result["track_id"] == "track-1"
+    assert result["root"] == "__Codex Curation Smoke Test 20260609-000000"
+    assert result["genre"] == "Smoke Genre 20260609-000000"
+    assert result["playlist"] == "Smoke One Track 20260609-000000"
+    assert result["copied"] == 1
+    assert result["duplicate_skipped"] is True
+    assert result["leftovers"] == {"root": 0, "genre": 0, "playlist": 0}
+    assert result["apply_result"]["applied"] == 5
+    assert run.call_count == 11
+
+
 def test_applescript_copy_track_searches_favourite_songs_before_library():
     script = Path("src/scripts/curation_structure.applescript").read_text(
         encoding="utf-8"

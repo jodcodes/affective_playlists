@@ -3,6 +3,7 @@ from __future__ import annotations
 import subprocess
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +16,10 @@ def _strip_process_output(value: Any) -> str:
     if isinstance(value, bytes):
         return value.decode(errors="replace").strip()
     return str(value).strip()
+
+
+def _applescript_string(value: str) -> str:
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
 @dataclass(frozen=True)
@@ -160,3 +165,169 @@ class AppleMusicStructureApplier:
             "failed": failed,
             "errors": errors,
         }
+
+    def run_smoke_test(
+        self, track_id: str, stamp: str | None = None
+    ) -> dict[str, Any]:
+        stamp = stamp or datetime.now().strftime("%Y%m%d-%H%M%S")
+        root = f"__Codex Curation Smoke Test {stamp}"
+        genre = f"Smoke Genre {stamp}"
+        playlist = f"Smoke One Track {stamp}"
+
+        changes = [
+            AppleMusicChange("ensure_folder", [root], f"Ensure folder {root}"),
+            AppleMusicChange(
+                "ensure_folder",
+                [root, genre],
+                f"Ensure folder {root} / {genre}",
+            ),
+            AppleMusicChange(
+                "ensure_playlist",
+                [root, genre, playlist],
+                f"Ensure playlist {playlist}",
+            ),
+            AppleMusicChange(
+                "copy_track",
+                [track_id, root, genre, playlist],
+                f"Copy smoke-test track to {playlist}",
+            ),
+            AppleMusicChange(
+                "copy_track",
+                [track_id, root, genre, playlist],
+                f"Copy smoke-test track to {playlist} again",
+            ),
+        ]
+
+        apply_result = self.apply_changes(changes, confirmed=True)
+        leftovers = self._cleanup_smoke_test(root, genre, playlist)
+        copied = 1 if int(apply_result.get("applied", 0)) >= 4 else 0
+        duplicate_skipped = int(apply_result.get("applied", 0)) >= 5
+
+        return {
+            "success": bool(apply_result.get("success"))
+            and all(count == 0 for count in leftovers.values()),
+            "track_id": track_id,
+            "root": root,
+            "genre": genre,
+            "playlist": playlist,
+            "copied": copied,
+            "duplicate_skipped": duplicate_skipped,
+            "leftovers": leftovers,
+            "apply_result": apply_result,
+        }
+
+    def _cleanup_smoke_test(
+        self, root: str, genre: str, playlist: str
+    ) -> dict[str, int]:
+        delete_playlist = f"""
+tell application "Music"
+    set playlistName to {_applescript_string(playlist)}
+    set genreName to {_applescript_string(genre)}
+    set rootName to {_applescript_string(root)}
+    set matches to every user playlist whose name is playlistName
+    repeat with candidate in matches
+        try
+            if name of parent of candidate is genreName and name of parent of parent of candidate is rootName then
+                delete candidate
+            end if
+        end try
+    end repeat
+end tell
+"""
+        delete_genre = f"""
+tell application "Music"
+    set genreName to {_applescript_string(genre)}
+    set rootName to {_applescript_string(root)}
+    set matches to every folder playlist whose name is genreName
+    repeat with candidate in matches
+        try
+            if name of parent of candidate is rootName then
+                delete candidate
+            end if
+        end try
+    end repeat
+end tell
+"""
+        delete_root = f"""
+tell application "Music"
+    set rootName to {_applescript_string(root)}
+    set matches to every folder playlist whose name is rootName
+    repeat with candidate in matches
+        try
+            delete candidate
+        end try
+    end repeat
+end tell
+"""
+
+        for script in (delete_playlist, delete_genre, delete_root):
+            subprocess.run(
+                ["osascript", "-e", script],
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+
+        return {
+            "root": self._count_smoke_root(root),
+            "genre": self._count_smoke_genre(root, genre),
+            "playlist": self._count_smoke_playlist(root, genre, playlist),
+        }
+
+    def _run_count_script(self, script: str) -> int:
+        result = subprocess.run(
+            ["osascript", "-e", script],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        try:
+            return int(_strip_process_output(result.stdout))
+        except ValueError:
+            return -1
+
+    def _count_smoke_root(self, root: str) -> int:
+        return self._run_count_script(
+            f"""
+tell application "Music"
+    return count of (every folder playlist whose name is {_applescript_string(root)})
+end tell
+"""
+        )
+
+    def _count_smoke_genre(self, root: str, genre: str) -> int:
+        return self._run_count_script(
+            f"""
+tell application "Music"
+    set genreName to {_applescript_string(genre)}
+    set rootName to {_applescript_string(root)}
+    set remaining to 0
+    set matches to every folder playlist whose name is genreName
+    repeat with candidate in matches
+        try
+            if name of parent of candidate is rootName then set remaining to remaining + 1
+        end try
+    end repeat
+    return remaining
+end tell
+"""
+        )
+
+    def _count_smoke_playlist(self, root: str, genre: str, playlist: str) -> int:
+        return self._run_count_script(
+            f"""
+tell application "Music"
+    set playlistName to {_applescript_string(playlist)}
+    set genreName to {_applescript_string(genre)}
+    set rootName to {_applescript_string(root)}
+    set remaining to 0
+    set matches to every user playlist whose name is playlistName
+    repeat with candidate in matches
+        try
+            if name of parent of candidate is genreName and name of parent of parent of candidate is rootName then set remaining to remaining + 1
+        end try
+    end repeat
+    return remaining
+end tell
+"""
+        )

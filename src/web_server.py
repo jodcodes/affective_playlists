@@ -598,6 +598,26 @@ def curation_apply():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/curation/smoke-test", methods=["POST"])
+def curation_smoke_test():
+    """Run a reversible one-track curation smoke test."""
+    try:
+        data = request.get_json(silent=True) or {}
+        scope = data.get("scope", "fav_songs")
+        if scope != "fav_songs":
+            return jsonify({"error": "Unsupported curation scope"}), 400
+
+        service = _get_curation_service()
+        if not service:
+            return jsonify({"error": "Curation service unavailable"}), 503
+
+        result = service.run_fav_songs_smoke_test()
+        return jsonify(result), 200 if result.get("success") else 500
+    except Exception as e:
+        logger.error(f"Failed to run curation smoke test: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/enrichment/status", methods=["GET"])
 @rate_limit(limit=300)  # Status polls can be frequent
 def enrichment_status():

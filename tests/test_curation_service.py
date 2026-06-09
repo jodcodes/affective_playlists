@@ -56,6 +56,44 @@ class FakeApplier:
         }
 
 
+class MiniTestAppleMusic:
+    def get_favourite_tracks(self):
+        return [
+            {
+                "persistent_id": "track-1",
+                "name": "Track A",
+                "artist": "Artist A",
+                "genre": "Hip-Hop",
+            }
+        ]
+
+
+class MiniTestApplier:
+    def __init__(self):
+        self.calls = []
+
+    def run_smoke_test(self, track_id):
+        self.calls.append(track_id)
+        return {
+            "success": True,
+            "track_id": track_id,
+            "copied": 1,
+            "duplicate_skipped": True,
+            "leftovers": {"root": 0, "genre": 0, "playlist": 0},
+        }
+
+
+class TracksWithoutStableId:
+    def get_favourite_tracks(self):
+        return [
+            {
+                "name": "Track Without ID",
+                "artist": "Artist B",
+                "genre": "Electronic",
+            }
+        ]
+
+
 class AppleMusicLikeTracks:
     def get_favourite_tracks(self):
         return [
@@ -181,6 +219,45 @@ def test_apply_fav_songs_delegates_to_applier_and_attaches_preview():
     assert changes[0].action == "ensure_folder"
     assert result["preview"]["total_assignments"] == 2
     assert result["preview"]["total_changes"] == len(changes)
+
+
+def test_mini_test_uses_first_favourite_track_and_reports_cleanup():
+    applier = MiniTestApplier()
+    service = CurationService(
+        apple_music=MiniTestAppleMusic(),
+        temper_classifier=StaticTemperClassifier(),
+        applier=applier,
+    )
+
+    result = service.run_fav_songs_smoke_test()
+
+    assert result["success"] is True
+    assert result["duplicate_skipped"] is True
+    assert result["leftovers"] == {"root": 0, "genre": 0, "playlist": 0}
+    assert result["source_track"]["persistent_id"] == "track-1"
+    assert result["source_track"]["name"] == "Track A"
+    assert result["source_track"]["artist"] == "Artist A"
+    assert applier.calls == ["track-1"]
+
+
+def test_mini_test_reports_no_stable_id_without_calling_applier():
+    applier = MiniTestApplier()
+    service = CurationService(
+        apple_music=TracksWithoutStableId(),
+        temper_classifier=StaticTemperClassifier(),
+        applier=applier,
+    )
+
+    result = service.run_fav_songs_smoke_test()
+
+    assert result == {
+        "success": False,
+        "error": "No Favourite Songs track with a stable persistent ID was found",
+        "copied": 0,
+        "duplicate_skipped": False,
+        "leftovers": {},
+    }
+    assert applier.calls == []
 
 
 def test_fav_preview_applies_store_overrides_over_auto_assignments(tmp_path):

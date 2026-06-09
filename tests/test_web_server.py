@@ -512,6 +512,15 @@ class TestCurationEndpoints:
                 "failed": 0,
             }
 
+    class SmokeTestService:
+        def __init__(self, result):
+            self.result = result
+            self.calls = 0
+
+        def run_fav_songs_smoke_test(self):
+            self.calls += 1
+            return self.result
+
     def test_curation_preview_returns_assignments_and_changes(self, client, monkeypatch):
         class FakeService:
             def preview_fav_songs(self):
@@ -676,6 +685,46 @@ class TestCurationEndpoints:
         assert response.status_code == 500
         assert response.get_json()["error"] == "Apply failed"
         assert service.confirmed_values == [False]
+
+    def test_curation_smoke_test_returns_success_response(self, client, monkeypatch):
+        service = self.SmokeTestService({"success": True})
+        monkeypatch.setattr("src.web_server._get_curation_service", lambda: service)
+
+        response = client.post("/api/curation/smoke-test", json={"scope": "fav_songs"})
+
+        assert response.status_code == 200
+        assert response.get_json() == {"success": True}
+        assert service.calls == 1
+
+    def test_curation_smoke_test_rejects_unsupported_scope(self, client, monkeypatch):
+        monkeypatch.setattr("src.web_server._get_curation_service", lambda: None)
+
+        response = client.post("/api/curation/smoke-test", json={"scope": "albums"})
+
+        assert response.status_code == 400
+        assert response.get_json()["error"] == "Unsupported curation scope"
+
+    def test_curation_smoke_test_returns_503_when_service_unavailable(
+        self, client, monkeypatch
+    ):
+        monkeypatch.setattr("src.web_server._get_curation_service", lambda: None)
+
+        response = client.post("/api/curation/smoke-test", json={"scope": "fav_songs"})
+
+        assert response.status_code == 503
+        assert response.get_json()["error"] == "Curation service unavailable"
+
+    def test_curation_smoke_test_returns_500_for_failure_result(
+        self, client, monkeypatch
+    ):
+        service = self.SmokeTestService({"success": False, "error": "Smoke failed"})
+        monkeypatch.setattr("src.web_server._get_curation_service", lambda: service)
+
+        response = client.post("/api/curation/smoke-test", json={"scope": "fav_songs"})
+
+        assert response.status_code == 500
+        assert response.get_json()["error"] == "Smoke failed"
+        assert service.calls == 1
 
     def test_curation_preview_rejects_unsupported_scope(self, client, monkeypatch):
         monkeypatch.setattr("src.web_server._get_curation_service", lambda: None)
