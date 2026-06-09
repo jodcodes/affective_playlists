@@ -87,10 +87,10 @@ class TracksWithMissingId:
 
 class FakeAppleMusicInterface(AppleMusicInterface):
     def __init__(self):
-        self.requested_playlists = []
+        self.requested_favourite_tracks = 0
 
-    def get_playlist_tracks(self, playlist_name):
-        self.requested_playlists.append(playlist_name)
+    def get_favourite_tracks(self):
+        self.requested_favourite_tracks += 1
         return [{"title": "Track A", "persistent_id": "track-a"}]
 
 
@@ -152,15 +152,17 @@ def test_fav_preview_skips_tracks_without_stable_id_and_reports_them():
     )
 
 
-def test_get_favourite_tracks_delegates_to_favourite_songs_playlist():
+def test_fav_preview_uses_favourite_tracks_interface():
     apple_music = FakeAppleMusicInterface()
+    service = CurationService(
+        apple_music=apple_music,
+        temper_classifier=StaticTemperClassifier(),
+    )
 
-    tracks = apple_music.get_favourite_tracks()
+    preview = service.preview_fav_songs()
 
-    assert apple_music.requested_playlists == ["Favourite Songs"]
-    assert tracks == [
-        {"title": "Track A", "persistent_id": "track-a", "name": "Track A"}
-    ]
+    assert apple_music.requested_favourite_tracks == 1
+    assert preview["assignments"][0]["item_name"] == "Track A"
 
 
 def test_apply_fav_songs_delegates_to_applier_and_attaches_preview():

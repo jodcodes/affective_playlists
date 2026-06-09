@@ -76,7 +76,9 @@ class AppleMusicStructurePlanner:
 class AppleMusicStructureApplier:
     def __init__(self, script_path: str | None = None) -> None:
         if script_path is None:
-            script_path = str(Path(__file__).parent / "scripts" / "curation_structure.js")
+            script_path = str(
+                Path(__file__).parent / "scripts" / "curation_structure.applescript"
+            )
         self.script_path = str(script_path)
 
     def apply_changes(
@@ -105,8 +107,6 @@ class AppleMusicStructureApplier:
         for change in changes:
             command = [
                 "osascript",
-                "-l",
-                "JavaScript",
                 self.script_path,
                 change.action,
                 *change.path,

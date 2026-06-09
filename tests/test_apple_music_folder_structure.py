@@ -60,7 +60,7 @@ class TestAppleMusicFolderStructure(unittest.TestCase):
             captured["script"] = script
             return (
                 True,
-                "{title:Track A, artist:Artist A, genre:Hip-Hop, persistent_id:ABC123}",
+                "ABC123\tTrack A\tArtist A\tHip-Hop\nDEF456\tTrack B\tArtist B\t",
             )
 
         mock_run.side_effect = fake_run
@@ -69,15 +69,18 @@ class TestAppleMusicFolderStructure(unittest.TestCase):
 
         script = " ".join(captured["script"].split())
         self.assertIn(
-            "set trackInfo to {title:name of trk, name:name of trk, "
-            "persistent_id:persistent ID of trk, artist:artist of trk, "
-            "album:album of trk, genre:genre of trk, bpm:bpm of trk, "
-            "year:year of trk, composer:composer of trk, duration:duration of trk}",
+            'set targetPlaylist to playlist "Favourite Songs"',
             script,
         )
+        self.assertIn("persistent ID of every track of targetPlaylist", script)
+        self.assertIn("name of every track of targetPlaylist", script)
+        self.assertNotIn("repeat with trk in tracks of targetPlaylist", script)
+        self.assertNotIn("composer of trk", script)
+        self.assertNotIn("duration of trk", script)
         self.assertEqual(result[0]["title"], "Track A")
         self.assertEqual(result[0]["name"], "Track A")
         self.assertEqual(result[0]["persistent_id"], "ABC123")
+        self.assertEqual(result[1]["genre"], "")
 
     @patch.object(AppleMusicInterface, "_run_applescript")
     def test_get_regular_playlist_tracks_raises_on_applescript_failure(self, mock_run):

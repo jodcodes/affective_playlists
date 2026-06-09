@@ -143,9 +143,9 @@ def test_applier_rejects_without_confirmation(tmp_path):
     assert result["failed"] == 0
 
 
-def test_applier_runs_confirmed_changes_with_jxa(tmp_path):
-    script_path = tmp_path / "curation_structure.js"
-    script_path.write_text("// test script", encoding="utf-8")
+def test_applier_runs_confirmed_changes_with_applescript(tmp_path):
+    script_path = tmp_path / "curation_structure.applescript"
+    script_path.write_text("-- test script", encoding="utf-8")
     applier = AppleMusicStructureApplier(script_path=str(script_path))
     change = AppleMusicChange("ensure_folder", ["Fav Songs"], "Ensure folder Fav Songs")
 
@@ -156,8 +156,6 @@ def test_applier_runs_confirmed_changes_with_jxa(tmp_path):
     run.assert_called_once_with(
         [
             "osascript",
-            "-l",
-            "JavaScript",
             str(script_path),
             "ensure_folder",
             "Fav Songs",
@@ -262,11 +260,13 @@ def test_applier_reports_missing_script_and_rejects_directories(tmp_path):
     assert result["failed"] == 0
 
 
-def test_jxa_copy_track_searches_favourite_songs_before_library():
-    script = Path("src/scripts/curation_structure.js").read_text(encoding="utf-8")
+def test_applescript_copy_track_searches_favourite_songs_before_library():
+    script = Path("src/scripts/curation_structure.applescript").read_text(
+        encoding="utf-8"
+    )
 
-    favourite_lookup = 'firstNamed(Music.playlists, "Favourite Songs")'
-    library_lookup = "Music.libraryPlaylists[0]"
+    favourite_lookup = 'playlist "Favourite Songs"'
+    library_lookup = "item 1 of library playlists"
     assert favourite_lookup in script
     assert library_lookup in script
     assert script.index(favourite_lookup) < script.index(library_lookup)
@@ -279,9 +279,7 @@ def test_curation_structure_no_arg_guard_returns_fast_error():
     result = subprocess.run(
         [
             "osascript",
-            "-l",
-            "JavaScript",
-            "src/scripts/curation_structure.js",
+            "src/scripts/curation_structure.applescript",
         ],
         capture_output=True,
         text=True,

@@ -248,8 +248,88 @@ end tell
 
     def get_favourite_tracks(self) -> List[Dict]:
         """Return tracks from Apple Music's Favourite Songs playlist."""
-        tracks = self.get_playlist_tracks("Favourite Songs")
-        return [self._normalize_track_dict(track) for track in tracks] if tracks else []
+        return [
+            self._normalize_track_dict(track)
+            for track in self._get_favourite_songs_tracks()
+        ]
+
+    def _get_favourite_songs_tracks(self) -> List[Dict]:
+        """Get only the Favourite Songs fields needed for curation preview."""
+        script = """
+on cleanText(rawValue)
+    try
+        set textValue to rawValue as text
+    on error
+        set textValue to ""
+    end try
+    set textValue to my replaceText(tab, " ", textValue)
+    set textValue to my replaceText(linefeed, " ", textValue)
+    set textValue to my replaceText(return, " ", textValue)
+    return textValue
+end cleanText
+
+on replaceText(findText, replaceTextValue, sourceText)
+    set oldDelimiters to AppleScript's text item delimiters
+    set AppleScript's text item delimiters to findText
+    set textItems to text items of sourceText
+    set AppleScript's text item delimiters to replaceTextValue
+    set sourceText to textItems as text
+    set AppleScript's text item delimiters to oldDelimiters
+    return sourceText
+end replaceText
+
+tell application "Music"
+    set trackRows to {}
+    set oldDelimiters to AppleScript's text item delimiters
+    try
+        set targetPlaylist to playlist "Favourite Songs"
+        set trackTotal to count of tracks of targetPlaylist
+        set trackIDs to persistent ID of every track of targetPlaylist
+        set trackNames to name of every track of targetPlaylist
+        set trackArtists to artist of every track of targetPlaylist
+        set trackGenres to genre of every track of targetPlaylist
+        repeat with trackIndex from 1 to trackTotal
+            set trackPID to my cleanText(item trackIndex of trackIDs)
+            set trackName to my cleanText(item trackIndex of trackNames)
+            set trackArtist to my cleanText(item trackIndex of trackArtists)
+            set trackGenre to my cleanText(item trackIndex of trackGenres)
+            set AppleScript's text item delimiters to tab
+            set end of trackRows to {trackPID, trackName, trackArtist, trackGenre} as text
+        end repeat
+        set AppleScript's text item delimiters to linefeed
+        set outputText to trackRows as text
+        set AppleScript's text item delimiters to oldDelimiters
+        return outputText
+    on error errMsg
+        set AppleScript's text item delimiters to oldDelimiters
+        error errMsg
+    end try
+end tell
+"""
+        success, output = self._run_applescript(script)
+        if not success:
+            raise RuntimeError(f"Failed to load Favourite Songs tracks: {output}")
+        if not output:
+            return []
+        return self._parse_favourite_songs_output(output)
+
+    def _parse_favourite_songs_output(self, output: str) -> List[Dict]:
+        tracks: List[Dict] = []
+        for row in output.splitlines():
+            fields = row.split("\t")
+            if len(fields) < 4:
+                fields.extend([""] * (4 - len(fields)))
+            persistent_id, name, artist, genre = fields[:4]
+            tracks.append(
+                {
+                    "persistent_id": persistent_id,
+                    "title": name,
+                    "name": name,
+                    "artist": artist,
+                    "genre": genre,
+                }
+            )
+        return tracks
 
     def _normalize_track_dict(self, track: Dict) -> Dict:
         """Normalize Apple Music track identity fields while preserving raw keys."""
