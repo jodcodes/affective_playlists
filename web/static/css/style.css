@@ -696,6 +696,10 @@ label {
     min-width: 0;
 }
 
+.curation-compat-shim {
+    display: none;
+}
+
 .control-main-header {
     display: flex;
     justify-content: space-between;
