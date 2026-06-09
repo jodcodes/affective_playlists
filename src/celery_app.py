@@ -31,6 +31,8 @@ app.conf.update(
     task_track_started=True,
     task_time_limit=int(os.getenv("CELERY_TASK_TIMEOUT", "3600")),
     task_soft_time_limit=int(os.getenv("CELERY_TASK_TIMEOUT", "3600")) - 60,
+    task_default_queue="default",
+    task_default_routing_key="default",
     # Retry configuration
     task_autoretry_for=(Exception,),
     task_max_retries=4,
@@ -42,20 +44,21 @@ app.conf.update(
     worker_concurrency=int(os.getenv("CELERY_WORKER_CONCURRENCY", "2")),
     # Task routing
     task_routes={
-        "affective_playlists.tasks.enrichment.*": {"queue": "enrichment"},
-        "affective_playlists.tasks.temperament.*": {"queue": "temperament"},
-        "affective_playlists.tasks.organization.*": {"queue": "organization"},
-        "affective_playlists.tasks.cleanup.*": {"queue": "background"},
+        "affective_playlists.tasks.curation:apply_curation": {"queue": "default"},
+        "affective_playlists.tasks.enrichment:enrich_metadata": {"queue": "enrichment"},
+        "affective_playlists.tasks.temperament:analyze_mood": {"queue": "temperament"},
+        "affective_playlists.tasks.organization:organize_playlists": {"queue": "organization"},
+        "affective_playlists.tasks.cleanup:cleanup_old_jobs": {"queue": "background"},
     },
 )
 
 # Task queue definitions
 app.conf.task_queues = (
-    Queue("enrichment", routing_key="enrichment.#"),
-    Queue("temperament", routing_key="temperament.#"),
-    Queue("organization", routing_key="organization.#"),
-    Queue("background", routing_key="background.#"),
-    Queue("default", routing_key="default.#"),
+    Queue("enrichment", routing_key="enrichment"),
+    Queue("temperament", routing_key="temperament"),
+    Queue("organization", routing_key="organization"),
+    Queue("background", routing_key="background"),
+    Queue("default", routing_key="default"),
 )
 
 if __name__ == "__main__":

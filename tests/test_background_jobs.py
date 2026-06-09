@@ -52,6 +52,15 @@ class TestTaskQueueInitialization:
         assert app.conf.task_queues
         assert all(isinstance(queue, Queue) for queue in app.conf.task_queues)
 
+    def test_curation_apply_routes_to_consumed_default_queue(self):
+        """Curation jobs should route to the queue consumed by the standard worker."""
+        from src.celery_app import app
+
+        assert app.conf.task_default_queue == "default"
+        assert app.conf.task_routes["affective_playlists.tasks.curation:apply_curation"] == {
+            "queue": "default"
+        }
+
     def test_health_check_includes_celery_status(self):
         """Health endpoint should show Celery status."""
         # GET /api/health should include celery_ready: true/false
