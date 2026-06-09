@@ -268,6 +268,19 @@ def run_curation(args=None):
 
     service = CurationService()
 
+    if args and getattr(args, "smoke_test", False):
+        result = service.run_fav_songs_smoke_test()
+        if result.get("success"):
+            print(success("Smoke test completed and cleaned up."))
+            print(info(f"copied: {result.get('copied', 0)}"))
+            print(info(f"duplicate_skipped: {result.get('duplicate_skipped', False)}"))
+            print(info(f"leftovers: {result.get('leftovers', {})}"))
+            return 0
+
+        print(error(f"Smoke test failed: {result.get('error', 'Unknown error')}"))
+        print(info(f"leftovers: {result.get('leftovers', {})}"))
+        return 1
+
     preview = service.preview_fav_songs()
     print(
         info(
@@ -356,6 +369,11 @@ def main(argv=None):
         "--apply",
         action="store_true",
         help="Apply Favourite Songs curation changes",
+    )
+    curate_parser.add_argument(
+        "--smoke-test",
+        action="store_true",
+        help="Run reversible one-track curation smoke test only",
     )
 
     args = parser.parse_args(argv)

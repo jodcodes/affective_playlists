@@ -15,14 +15,22 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 
-def install_fake_curation_service(monkeypatch, preview=None, apply_result=None):
-    calls = {"constructed": 0, "preview": 0, "apply": []}
+def install_fake_curation_service(
+    monkeypatch, preview=None, apply_result=None, smoke_result=None
+):
+    calls = {"constructed": 0, "preview": 0, "apply": [], "smoke": 0}
     preview_result = preview or {
         "total_assignments": 3,
         "total_changes": 2,
         "total_skipped": 1,
     }
     result = apply_result or {"success": True, "applied": 2, "failed": 0}
+    smoke = smoke_result or {
+        "success": True,
+        "copied": 1,
+        "duplicate_skipped": True,
+        "leftovers": {"root": 0, "genre": 0, "playlist": 0},
+    }
 
     class FakeCurationService:
         def __init__(self):
@@ -35,6 +43,10 @@ def install_fake_curation_service(monkeypatch, preview=None, apply_result=None):
         def apply_fav_songs(self, confirmed):
             calls["apply"].append(confirmed)
             return result
+
+        def run_fav_songs_smoke_test(self):
+            calls["smoke"] += 1
+            return smoke
 
     monkeypatch.setitem(
         sys.modules,
@@ -161,13 +173,14 @@ def test_curate_feature_accepts_dry_run(monkeypatch):
     def fake_run_curation(args):
         calls["scope"] = args.scope
         calls["apply"] = args.apply
+        calls["smoke_test"] = args.smoke_test
         return 0
 
     monkeypatch.setattr(main, "run_curation", fake_run_curation, raising=False)
     monkeypatch.setattr(main, "IS_MACOS", True)
 
     assert main.main(["curate", "--scope", "fav_songs"]) == 0
-    assert calls == {"scope": "fav_songs", "apply": False}
+    assert calls == {"scope": "fav_songs", "apply": False, "smoke_test": False}
 
 
 def test_curate_feature_accepts_apply(monkeypatch):
@@ -178,13 +191,32 @@ def test_curate_feature_accepts_apply(monkeypatch):
     def fake_run_curation(args):
         calls["scope"] = args.scope
         calls["apply"] = args.apply
+        calls["smoke_test"] = args.smoke_test
         return 0
 
     monkeypatch.setattr(main, "run_curation", fake_run_curation, raising=False)
     monkeypatch.setattr(main, "IS_MACOS", True)
 
     assert main.main(["curate", "--scope", "fav_songs", "--apply"]) == 0
-    assert calls == {"scope": "fav_songs", "apply": True}
+    assert calls == {"scope": "fav_songs", "apply": True, "smoke_test": False}
+
+
+def test_curate_feature_accepts_smoke_test(monkeypatch):
+    import main
+
+    calls = {}
+
+    def fake_run_curation(args):
+        calls["scope"] = args.scope
+        calls["apply"] = args.apply
+        calls["smoke_test"] = args.smoke_test
+        return 0
+
+    monkeypatch.setattr(main, "run_curation", fake_run_curation, raising=False)
+    monkeypatch.setattr(main, "IS_MACOS", True)
+
+    assert main.main(["curate", "--scope", "fav_songs", "--smoke-test"]) == 0
+    assert calls == {"scope": "fav_songs", "apply": False, "smoke_test": True}
 
 
 def test_curate_feature_on_non_macos_exits_without_service(monkeypatch):
@@ -242,7 +274,7 @@ def test_run_curation_dry_run_previews_without_apply(monkeypatch, capsys):
     monkeypatch.setattr(main, "IS_MACOS", True)
 
     assert main.run_curation(SimpleNamespace(apply=False)) == 0
-    assert calls == {"constructed": 1, "preview": 1, "apply": []}
+    assert calls == {"constructed": 1, "preview": 1, "apply": [], "smoke": 0}
 
     output = capsys.readouterr().out
     assert "Preview" in output
@@ -256,7 +288,7 @@ def test_run_curation_apply_is_locked_without_service_apply(monkeypatch, capsys)
     monkeypatch.setattr(main, "IS_MACOS", True)
 
     assert main.run_curation(SimpleNamespace(apply=True)) == 1
-    assert calls == {"constructed": 0, "preview": 0, "apply": []}
+    assert calls == {"constructed": 0, "preview": 0, "apply": [], "smoke": 0}
 
     output = capsys.readouterr().out
     assert "Full apply is locked" in output
@@ -270,4 +302,19 @@ def test_run_curation_apply_lock_does_not_mask_dry_run(monkeypatch):
     monkeypatch.setattr(main, "IS_MACOS", True)
 
     assert main.run_curation(SimpleNamespace(apply=False)) == 0
-    assert calls == {"constructed": 1, "preview": 1, "apply": []}
+    assert calls == {"constructed": 1, "preview": 1, "apply": [], "smoke": 0}
+
+
+def test_run_curation_smoke_test_only_runs_reversible_smoke(monkeypatch, capsys):
+    import main
+
+    calls = install_fake_curation_service(monkeypatch)
+    monkeypatch.setattr(main, "IS_MACOS", True)
+
+    assert main.run_curation(SimpleNamespace(apply=False, smoke_test=True)) == 0
+    assert calls == {"constructed": 1, "preview": 0, "apply": [], "smoke": 1}
+
+    output = capsys.readouterr().out
+    assert "Smoke test" in output
+    assert "copied: 1" in output
+    assert "leftovers: {'root': 0, 'genre': 0, 'playlist': 0}" in output
