@@ -583,6 +583,8 @@ def curation_apply():
         confirmed = data.get("confirmed", False)
         if not isinstance(confirmed, bool):
             return jsonify({"error": "confirmed must be a boolean"}), 400
+        if confirmed is not True:
+            return jsonify({"error": "Confirmation required"}), 400
 
         mini_test_passed = data.get("mini_test_passed", False)
         if mini_test_passed is not True:

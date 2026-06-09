@@ -638,6 +638,30 @@ class TestCurationEndpoints:
         assert payload["status"] == "queued"
         assert payload["job_id"].startswith("curation-apply-")
 
+    def test_curation_apply_requires_true_confirmation_after_gate(
+        self, client, monkeypatch
+    ):
+        class FakeService:
+            def get_fav_songs_snapshot(self):
+                return {"available": True, "fresh": True}
+
+            def apply_fav_songs(self, confirmed):
+                raise AssertionError("full apply should not run synchronously")
+
+        monkeypatch.setattr("src.web_server._get_curation_service", lambda: FakeService())
+
+        response = client.post(
+            "/api/curation/apply",
+            json={
+                "scope": "fav_songs",
+                "confirmed": False,
+                "mini_test_passed": True,
+            },
+        )
+
+        assert response.status_code == 400
+        assert response.get_json()["error"] == "Confirmation required"
+
     def test_curation_apply_rejects_stale_snapshot_after_gate(
         self, client, monkeypatch
     ):
