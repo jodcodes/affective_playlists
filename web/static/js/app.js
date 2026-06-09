@@ -567,6 +567,15 @@ function hasFreshCurationSnapshot() {
     return Boolean(curationSnapshot && curationSnapshot.available && curationSnapshot.fresh);
 }
 
+function hasPassedSmokeTestForCurrentSnapshot() {
+    return Boolean(
+        hasFreshCurationSnapshot() &&
+        curationSmokeTest &&
+        curationSmokeTest.success &&
+        curationSmokeTest.snapshotCreatedAt === curationSnapshot.created_at
+    );
+}
+
 function setCurationButtonsState() {
     const isBusy = curationPreviewLoading || curationRefreshLoading || curationApplyInFlight;
     const hasFreshSnapshot = hasFreshCurationSnapshot();
@@ -589,7 +598,7 @@ function setCurationButtonsState() {
         smokeTestBtn.disabled = isBusy || !hasFreshSnapshot;
     }
     if (applyBtn) {
-        applyBtn.disabled = isBusy || !hasFreshSnapshot || !(curationSmokeTest && curationSmokeTest.success);
+        applyBtn.disabled = isBusy || !hasPassedSmokeTestForCurrentSnapshot();
     }
 }
 
@@ -606,6 +615,7 @@ async function loadCurationSnapshot() {
 
         curationSnapshot = snapshot;
         curationPreview = snapshot && snapshot.available ? snapshot : null;
+        curationSmokeTest = null;
         renderCurationControlCenter(snapshot);
         app.state.isOnline = true;
         updateStatus();
@@ -909,8 +919,10 @@ function renderCurationWritePanel(snapshot, smokeTest = curationSmokeTest) {
 
     if (!smokeTest) {
         appendElement(panel, 'p', 'text-muted', 'Mini-test: not run. Full apply is locked.');
-    } else if (smokeTest.success) {
+    } else if (smokeTest.success && hasPassedSmokeTestForCurrentSnapshot()) {
         appendElement(panel, 'p', 'status-success', 'Mini-test: passed. Full apply is available.');
+    } else if (smokeTest.success) {
+        appendElement(panel, 'p', 'text-muted', 'Mini-test: not run for the current snapshot. Full apply is locked.');
     } else {
         const error = textValue(smokeTest.error, 'Unknown error');
         appendElement(panel, 'p', 'status-danger', `Mini-test: failed. ${error}`);
@@ -1085,7 +1097,7 @@ function renderCurationError(message) {
 }
 
 async function runCurationSmokeTest() {
-    if (!curationSnapshot || !curationSnapshot.fresh) {
+    if (!hasFreshCurationSnapshot()) {
         showAlert('Refresh the curation snapshot before running the mini-test.', 'warning');
         return;
     }
@@ -1099,8 +1111,8 @@ async function runCurationSmokeTest() {
             body: { scope: 'fav_songs' },
         });
 
-        curationSmokeTest = result;
-        renderCurationWritePanel(curationSnapshot, result);
+        curationSmokeTest = { ...result, snapshotCreatedAt: curationSnapshot.created_at };
+        renderCurationWritePanel(curationSnapshot, curationSmokeTest);
         showAlert('Mini-test completed and cleaned up.', 'success');
     } catch (error) {
         curationSmokeTest = { success: false, error: error.message };
@@ -1114,6 +1126,12 @@ async function runCurationSmokeTest() {
 
 async function applyFavSongsCuration() {
     if (curationApplyInFlight || curationPreviewLoading || curationRefreshLoading) {
+        return;
+    }
+
+    if (!hasPassedSmokeTestForCurrentSnapshot()) {
+        setCurationButtonsState();
+        showAlert('Run a successful mini-test against the current fresh snapshot before full apply.', 'warning');
         return;
     }
 
