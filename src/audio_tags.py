@@ -120,8 +120,6 @@ class MP3TagHandler(AudioTagHandler):
         """
         Write ID3v2 tags to MP3 file.
 
-        Note: Simplified implementation. Production code should use dedicated library.
-
         Args:
             tags: {field: value} dict
             overwrite: Whether to overwrite existing tags
@@ -129,15 +127,59 @@ class MP3TagHandler(AudioTagHandler):
         Returns:
             True if successful
         """
-        # For this implementation, we log what would be written
-        # Full implementation would actually write ID3v2 frames
-        self.logger.info(f"Would write ID3v2 tags to {self.filepath}:")
-        for field, value in tags.items():
-            frame_id = self.FRAME_MAPPING.get(field, field)
-            self.logger.debug(f"  {frame_id}: {value}")
+        if not os.path.exists(self.filepath):
+            self.logger.warning(f"File not found: {self.filepath}")
+            return False
 
-        # Placeholder return
-        return True
+        try:
+            from mutagen.id3 import (
+                ID3,
+                ID3NoHeaderError,
+                TALB,
+                TBPM,
+                TCON,
+                TDRC,
+                TIT2,
+                TPE1,
+            )
+
+            frame_classes = {
+                "TBPM": TBPM,
+                "TCON": TCON,
+                "TDRC": TDRC,
+                "TPE1": TPE1,
+                "TIT2": TIT2,
+                "TALB": TALB,
+            }
+
+            try:
+                audio = ID3(self.filepath)
+            except ID3NoHeaderError:
+                audio = ID3()
+
+            for field, value in tags.items():
+                clean_value = str(value).strip()
+                if not clean_value:
+                    continue
+
+                frame_id = self.FRAME_MAPPING.get(field, field)
+                frame_class = frame_classes.get(frame_id)
+                if frame_class is None:
+                    self.logger.debug(f"Unsupported MP3 tag field: {field}")
+                    continue
+                if frame_id in audio and not overwrite:
+                    continue
+
+                audio.setall(frame_id, [frame_class(encoding=3, text=[clean_value])])
+
+            audio.save(self.filepath)
+            return True
+        except ImportError:
+            self.logger.warning("mutagen not installed - cannot write MP3 tags")
+            return False
+        except Exception as e:
+            self.logger.error(f"Failed to write MP3 tags to {self.filepath}: {e}")
+            return False
 
     def _synchsafe_int(self, data: bytes) -> int:
         """Convert synchsafe integer (ID3v2 size format)."""
@@ -401,6 +443,10 @@ class TagManager:
         Returns:
             True if successful
         """
+        if not os.path.exists(filepath):
+            self.logger.error(f"File not found: {filepath}")
+            return False
+
         handler = AudioTagFactory.create_handler(filepath)
         if not handler:
             self.logger.error(f"Unsupported format: {filepath}")

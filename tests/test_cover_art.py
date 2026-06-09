@@ -313,6 +313,16 @@ class TestCoverArtEmbedder(unittest.TestCase):
 
         self.assertFalse(result)
 
+    def test_unsupported_image_data_is_rejected(self):
+        """Test unsupported image data is rejected for existing files."""
+        filepath = os.path.join(self.temp_dir, "test.mp3")
+        with open(filepath, "wb") as f:
+            f.write(b"dummy")
+
+        result = self.embedder.embed(filepath, b"not an image")
+
+        self.assertFalse(result)
+
 
 class TestCoverArtManager(unittest.TestCase):
     """Tests for CoverArtManager."""

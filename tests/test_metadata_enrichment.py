@@ -321,6 +321,59 @@ class TestMockMetadataEnrichment(unittest.TestCase):
         self.assertIn("musicbrainz", results)
         self.assertIn("lastfm", results)
 
+    def test_write_enriched_metadata_reports_year_and_cover_paths(self):
+        """Explicit metadata writes should report tag and cover handling."""
+
+        class FakeTagManager:
+            def __init__(self):
+                self.calls = []
+
+            def write_tags(self, filepath, tags, overwrite=False):
+                self.calls.append(
+                    {"filepath": filepath, "tags": tags, "overwrite": overwrite}
+                )
+                return True
+
+        tag_manager = FakeTagManager()
+        enricher = MetadataEnricher(tag_manager=tag_manager)
+        track = TrackIdentifier(artist="Artist", title="Title")
+        enriched = EnrichedMetadata(track_id=track, filepath="/tmp/song.mp3")
+        enriched.add_entry(
+            MetadataEntry(
+                MetadataField.YEAR,
+                "1999",
+                DatabaseSource.MUSICBRAINZ,
+            )
+        )
+        enriched.add_entry(
+            MetadataEntry(
+                MetadataField.COVER_ART,
+                "cover-cache-key",
+                DatabaseSource.LASTFM,
+            )
+        )
+
+        result = enricher.write_enriched_metadata(enriched, overwrite=False)
+
+        self.assertEqual(
+            tag_manager.calls,
+            [
+                {
+                    "filepath": "/tmp/song.mp3",
+                    "tags": {"year": "1999"},
+                    "overwrite": False,
+                }
+            ],
+        )
+        self.assertEqual(result["applied_fields"], ["year"])
+        self.assertEqual(
+            result["skipped_fields"],
+            {
+                "cover_art": "Use CoverArtManager for binary cover art writes",
+            },
+        )
+        self.assertEqual(result["failed_fields"], {})
+
 
 class TestStateManagement(unittest.TestCase):
     """Test state persistence and recovery."""

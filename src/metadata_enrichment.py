@@ -35,6 +35,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
+from src.audio_tags import TagManager
+
 
 class MetadataField(Enum):
     """Metadata fields that can be enriched."""
@@ -282,10 +284,15 @@ class MetadataRequirements:
 class MetadataEnricher:
     """Main orchestrator for metadata enrichment workflow."""
 
-    def __init__(self, logger: Optional[logging.Logger] = None):
+    def __init__(
+        self,
+        logger: Optional[logging.Logger] = None,
+        tag_manager: Optional[TagManager] = None,
+    ):
         self.logger = logger or logging.getLogger(__name__)
         self.track_detector = DownloadedTrackDetector()
         self.requirements = MetadataRequirements()
+        self.tag_manager = tag_manager or TagManager()
         self.enrichment_history: List[EnrichedMetadata] = []
 
     def enrich_track(
@@ -358,6 +365,37 @@ class MetadataEnricher:
             self.enrichment_history.append(result)
 
         return results
+
+    def write_enriched_metadata(
+        self, enriched: EnrichedMetadata, overwrite: bool = False
+    ) -> Dict[str, Any]:
+        """Write enriched metadata fields back to the audio file."""
+        result: Dict[str, Any] = {
+            "filepath": enriched.filepath,
+            "applied_fields": [],
+            "skipped_fields": {},
+            "failed_fields": {},
+        }
+        tag_values: Dict[str, str] = {}
+
+        for metadata_field, entry in enriched.entries.items():
+            if metadata_field == MetadataField.COVER_ART:
+                result["skipped_fields"][metadata_field.value] = (
+                    "Use CoverArtManager for binary cover art writes"
+                )
+                continue
+            tag_values[metadata_field.value] = entry.value
+
+        if not tag_values:
+            return result
+
+        if self.tag_manager.write_tags(enriched.filepath, tag_values, overwrite):
+            result["applied_fields"].extend(tag_values.keys())
+            return result
+
+        for field_name in tag_values:
+            result["failed_fields"][field_name] = "Tag write failed"
+        return result
 
     def get_enrichment_summary(self) -> Dict:
         """Get summary of enrichment session."""
